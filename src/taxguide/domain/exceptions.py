@@ -7,15 +7,15 @@ class DocumentLoadError(TaxguideError):
 
 
 class UnsupportedDocumentError(TaxguideError):
-    pass
+    """No parser supports the document's source or format."""
 
 
 class ParseError(TaxguideError):
-    pass
+    """A supported document could not be parsed into usable content."""
 
 
 class EmptyDocumentError(ParseError):
-    pass
+    """Parsing a supported document produced no substantive content."""
 
 
 class InvalidConfigurationError(TaxguideError):
