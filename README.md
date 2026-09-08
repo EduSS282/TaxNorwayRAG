@@ -92,7 +92,8 @@ and type checking. Pre-commit hooks check Ruff rules, formatting, YAML, and whit
 
 See [architecture](docs/architecture.md) and [ingestion](docs/ingestion.md) for details.
 
-## Next phase
+## Current follow-on work
 
-Implement and compare multiple chunking strategies over the normalized `Document`
-representation. That phase is deliberately left for a subsequent iteration.
+Phase 2 adds fixed-token, recursive, and structural chunking over the normalized
+`Document` representation. Retrieval, embeddings, vector databases, and LLM
+generation remain out of scope.
