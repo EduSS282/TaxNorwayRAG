@@ -74,3 +74,29 @@ class ParsedDocument(SourceIdentity):
 
 class Document(ParsedDocument):
     plain_text: str = Field(min_length=1)
+
+
+class ChunkMetadata(DomainModel):
+    """Source context copied to every chunk for traceability."""
+
+    title: str | None = None
+    source_url: str
+    source_domain: str
+    language: str | None = None
+    retrieved_at: AwareDatetime
+    document_content_hash: Digest
+
+
+class Chunk(DomainModel):
+    """A deterministic, independently addressable excerpt of a normalized document."""
+
+    id: Digest
+    document_id: Digest
+    text: str = Field(min_length=1)
+    section_path: tuple[str, ...] = ()
+    chunk_index: int = Field(ge=0)
+    token_count: int = Field(ge=0)
+    content_hash: Digest
+    previous_chunk_id: Digest | None = None
+    next_chunk_id: Digest | None = None
+    metadata: ChunkMetadata
