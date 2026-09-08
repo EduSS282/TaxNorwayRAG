@@ -1,0 +1,13 @@
+project:
+  name: taxguide-norway
+  environment: development
+paths:
+  raw_data: data/raw
+  parsed_data: data/parsed
+  normalized_data: data/normalized
+ingestion:
+  parser: skatteetaten
+  preserve_links: true
+  preserve_headings: true
+logging:
+  level: INFO

@@ -1,0 +1,4 @@
+project:
+  environment: test
+logging:
+  level: WARNING
