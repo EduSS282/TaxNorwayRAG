@@ -114,9 +114,7 @@ def test_list_indentation_uses_deterministic_spaces(independent_parsed):
         update={
             "sections": [
                 Section(
-                    paragraphs=[
-                        Paragraph(kind=ParagraphKind.LIST, text="\t* First\n\t\t* Second")
-                    ]
+                    paragraphs=[Paragraph(kind=ParagraphKind.LIST, text="\t* First\n\t\t* Second")]
                 )
             ]
         }

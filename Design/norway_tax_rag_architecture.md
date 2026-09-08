@@ -490,23 +490,14 @@ Puede añadirse posteriormente como experimento comparativo.
 from typing import Protocol
 import numpy as np
 
+
 class Embedder(Protocol):
+    def embed_documents(self, texts: list[str]) -> np.ndarray: ...
 
-    def embed_documents(
-        self,
-        texts: list[str]
-    ) -> np.ndarray:
-        ...
-
-    def embed_query(
-        self,
-        query: str
-    ) -> np.ndarray:
-        ...
+    def embed_query(self, query: str) -> np.ndarray: ...
 
     @property
-    def dimension(self) -> int:
-        ...
+    def dimension(self) -> int: ...
 ```
 
 Implementaciones:
@@ -684,16 +675,9 @@ model_profile: quality
 ```python
 from typing import Protocol
 
-class Generator(Protocol):
 
-    def generate(
-        self,
-        messages: list[dict],
-        *,
-        temperature: float,
-        max_tokens: int
-    ) -> str:
-        ...
+class Generator(Protocol):
+    def generate(self, messages: list[dict], *, temperature: float, max_tokens: int) -> str: ...
 ```
 
 Implementaciones posibles:
@@ -1067,18 +1051,7 @@ Objetivo:
 Ejemplo:
 
 ```python
-ParsedDocument(
-    title="...",
-    headings=[
-        ...
-    ],
-    paragraphs=[
-        ...
-    ],
-    tables=[
-        ...
-    ]
-)
+ParsedDocument(title="...", headings=[...], paragraphs=[...], tables=[...])
 ```
 
 ---
@@ -1792,10 +1765,7 @@ source
 Ejemplo:
 
 ```python
-filter = {
-    "tax_year": 2025,
-    "audience": "individual"
-}
+filter = {"tax_year": 2025, "audience": "individual"}
 ```
 
 ---
@@ -1837,10 +1807,7 @@ Output:
 Ejemplo:
 
 ```python
-reranker.rank(
-    query=query,
-    documents=candidates
-)
+reranker.rank(query=query, documents=candidates)
 ```
 
 ---
@@ -1982,18 +1949,13 @@ Ejemplo:
 
 ```python
 class RagAnswer(BaseModel):
-
     answer: str
 
     tax_year: int | None
 
     citations: list[Citation]
 
-    confidence: Literal[
-        "high",
-        "medium",
-        "low"
-    ]
+    confidence: Literal["high", "medium", "low"]
 
     needs_clarification: bool
 
@@ -2010,7 +1972,6 @@ Cada citation:
 
 ```python
 class Citation(BaseModel):
-
     citation_id: str
     chunk_id: str
 
@@ -2170,7 +2131,6 @@ Más adelante:
 
 ```python
 class TaxProfile(BaseModel):
-
     tax_year: int
 
     residence_country: str | None
@@ -2371,14 +2331,7 @@ No borrar inmediatamente la versión anterior.
 Modelo recomendado:
 
 ```python
-DocumentVersion(
-    document_id,
-    version_id,
-    valid_from,
-    valid_to,
-    retrieved_at,
-    content_hash
-)
+DocumentVersion(document_id, version_id, valid_from, valid_to, retrieved_at, content_hash)
 ```
 
 Esto permite responder:
@@ -2872,32 +2825,19 @@ No implementa algoritmos.
 
 ```python
 class RagService:
-
     async def answer(self, request):
 
         query = self.query_processor.process(request)
 
         candidates = await self.retriever.retrieve(query)
 
-        ranked = await self.reranker.rerank(
-            query,
-            candidates
-        )
+        ranked = await self.reranker.rerank(query, candidates)
 
-        context = self.context_builder.build(
-            query,
-            ranked
-        )
+        context = self.context_builder.build(query, ranked)
 
-        answer = await self.generator.generate(
-            query,
-            context
-        )
+        answer = await self.generator.generate(query, context)
 
-        return self.validator.validate(
-            answer,
-            context
-        )
+        return self.validator.validate(answer, context)
 ```
 
 ---
