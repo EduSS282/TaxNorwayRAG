@@ -10,9 +10,9 @@ from taxguide.vectorstores.base import ScoredChunk
 class QdrantClient(Protocol):
     def upsert(self, *, collection_name: str, points: list[dict[str, Any]]) -> None: ...
 
-    def search(
-        self, *, collection_name: str, query_vector: list[float], limit: int, with_payload: bool
-    ) -> list[dict[str, Any]]: ...
+    def query_points(
+        self, *, collection_name: str, query: list[float], limit: int, with_payload: bool
+    ) -> Any: ...
 
 
 class QdrantVectorStore:
@@ -35,15 +35,18 @@ class QdrantVectorStore:
     def search(self, query: Embedding, *, limit: int) -> list[ScoredChunk]:
         if limit <= 0:
             raise ValueError("limit must be positive")
-        records = self._client.search(
+        response = self._client.query_points(
             collection_name=self._collection_name,
-            query_vector=list(query),
+            query=list(query),
             limit=limit,
             with_payload=True,
         )
         return [
-            ScoredChunk(chunk=Chunk.model_validate(record["payload"]), score=record["score"])
-            for record in records
+            ScoredChunk(
+                chunk=Chunk.model_validate(record.payload),
+                score=record.score,
+            )
+            for record in response.points
         ]
 
 

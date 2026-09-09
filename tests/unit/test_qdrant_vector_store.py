@@ -15,14 +15,25 @@ class FakeQdrantClient:
         assert collection_name == "taxguide_chunks"
         self.points = points
 
-    def search(
-        self, *, collection_name: str, query_vector: list[float], limit: int, with_payload: bool
-    ) -> list[dict[str, Any]]:
+    def query_points(
+        self, *, collection_name: str, query: list[float], limit: int, with_payload: bool
+    ) -> "FakeQueryResponse":
         assert collection_name == "taxguide_chunks"
-        assert query_vector == [0.1, 0.2]
+        assert query == [0.1, 0.2]
         assert limit == 1
         assert with_payload is True
-        return [{"payload": self.points[0]["payload"], "score": 0.9}]
+        return FakeQueryResponse([FakeScoredPoint(self.points[0]["payload"], 0.9)])
+
+
+class FakeScoredPoint:
+    def __init__(self, payload: dict[str, Any], score: float) -> None:
+        self.payload = payload
+        self.score = score
+
+
+class FakeQueryResponse:
+    def __init__(self, points: list[FakeScoredPoint]) -> None:
+        self.points = points
 
 
 def test_qdrant_store_indexes_chunk_payloads_and_restores_search_results() -> None:
