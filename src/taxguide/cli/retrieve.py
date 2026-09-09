@@ -34,6 +34,9 @@ def retrieve(
     except (RuntimeError, ValueError) as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
+    except Exception as error:
+        typer.echo(f"Error: Qdrant request failed: {error}", err=True)
+        raise typer.Exit(1) from error
     for position, result in enumerate(results, start=1):
         typer.echo(
             f"{position}. score={result.score:.4f} source={result.chunk.metadata.source_url}\n"
