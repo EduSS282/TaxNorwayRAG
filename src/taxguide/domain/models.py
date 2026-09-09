@@ -83,6 +83,9 @@ class ChunkMetadata(DomainModel):
     source_url: str
     source_domain: str
     language: str | None = None
+    tax_year: int | None = Field(default=None, ge=1900, le=2100)
+    document_type: str | None = None
+    audience: str | None = None
     retrieved_at: AwareDatetime
     document_content_hash: Digest
 
