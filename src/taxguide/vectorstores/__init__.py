@@ -1,0 +1,1 @@
+"""Replaceable vector store adapters."""
