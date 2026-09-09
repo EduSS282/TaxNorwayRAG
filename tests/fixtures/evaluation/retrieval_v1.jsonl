@@ -1,0 +1,50 @@
+{"id":"en-01","question":"When is the tax return deadline?","language":"en","relevant_chunk_ids":["deadline"]}
+{"id":"en-02","question":"How do I change my tax card?","language":"en","relevant_chunk_ids":["tax-card"]}
+{"id":"en-03","question":"Where can I see my income?","language":"en","relevant_chunk_ids":["income"]}
+{"id":"en-04","question":"Can I deduct commuting costs?","language":"en","relevant_chunk_ids":["deductions"]}
+{"id":"en-05","question":"How do I pay outstanding tax?","language":"en","relevant_chunk_ids":["payment"]}
+{"id":"en-06","question":"What is the wealth tax?","language":"en","relevant_chunk_ids":["wealth"]}
+{"id":"en-07","question":"How do I report foreign income?","language":"en","relevant_chunk_ids":["foreign-income"]}
+{"id":"en-08","question":"What documents support deductions?","language":"en","relevant_chunk_ids":["deductions"]}
+{"id":"en-09","question":"How can I appeal an assessment?","language":"en","relevant_chunk_ids":["appeal"]}
+{"id":"en-10","question":"How do I update my address?","language":"en","relevant_chunk_ids":["personal-details"]}
+{"id":"en-11","question":"What is the PAYE scheme?","language":"en","relevant_chunk_ids":["paye"]}
+{"id":"en-12","question":"How do I report rental income?","language":"en","relevant_chunk_ids":["rental"]}
+{"id":"en-13","question":"When is advance tax due?","language":"en","relevant_chunk_ids":["advance-tax"]}
+{"id":"en-14","question":"How do I find my tax assessment?","language":"en","relevant_chunk_ids":["assessment"]}
+{"id":"en-15","question":"Can I deduct childcare expenses?","language":"en","relevant_chunk_ids":["deductions"]}
+{"id":"en-16","question":"How is salary taxed?","language":"en","relevant_chunk_ids":["income"]}
+{"id":"en-17","question":"What happens after late filing?","language":"en","relevant_chunk_ids":["deadline"]}
+{"id":"no-01","question":"Når er fristen for skattemeldingen?","language":"no","relevant_chunk_ids":["deadline"]}
+{"id":"no-02","question":"Hvordan endrer jeg skattekortet?","language":"no","relevant_chunk_ids":["tax-card"]}
+{"id":"no-03","question":"Hvor ser jeg inntekten min?","language":"no","relevant_chunk_ids":["income"]}
+{"id":"no-04","question":"Kan jeg få fradrag for reise?","language":"no","relevant_chunk_ids":["deductions"]}
+{"id":"no-05","question":"Hvordan betaler jeg restskatt?","language":"no","relevant_chunk_ids":["payment"]}
+{"id":"no-06","question":"Hva er formuesskatt?","language":"no","relevant_chunk_ids":["wealth"]}
+{"id":"no-07","question":"Hvordan oppgir jeg inntekt fra utlandet?","language":"no","relevant_chunk_ids":["foreign-income"]}
+{"id":"no-08","question":"Hvilke bilag trenger jeg for fradrag?","language":"no","relevant_chunk_ids":["deductions"]}
+{"id":"no-09","question":"Hvordan klager jeg på skatteoppgjøret?","language":"no","relevant_chunk_ids":["appeal"]}
+{"id":"no-10","question":"Hvordan endrer jeg adressen min?","language":"no","relevant_chunk_ids":["personal-details"]}
+{"id":"no-11","question":"Hva er kildeskatt på lønn?","language":"no","relevant_chunk_ids":["paye"]}
+{"id":"no-12","question":"Hvordan oppgir jeg leieinntekter?","language":"no","relevant_chunk_ids":["rental"]}
+{"id":"no-13","question":"Når betaler jeg forskuddsskatt?","language":"no","relevant_chunk_ids":["advance-tax"]}
+{"id":"no-14","question":"Hvor finner jeg skatteoppgjøret?","language":"no","relevant_chunk_ids":["assessment"]}
+{"id":"no-15","question":"Kan jeg få fradrag for barnepass?","language":"no","relevant_chunk_ids":["deductions"]}
+{"id":"no-16","question":"Hvordan beskattes lønn?","language":"no","relevant_chunk_ids":["income"]}
+{"id":"no-17","question":"Hva skjer ved forsinket levering?","language":"no","relevant_chunk_ids":["deadline"]}
+{"id":"es-01","question":"¿Cuándo vence la declaración de impuestos?","language":"es","relevant_chunk_ids":["deadline"]}
+{"id":"es-02","question":"¿Cómo cambio mi tarjeta fiscal?","language":"es","relevant_chunk_ids":["tax-card"]}
+{"id":"es-03","question":"¿Dónde veo mis ingresos?","language":"es","relevant_chunk_ids":["income"]}
+{"id":"es-04","question":"¿Puedo deducir los gastos de viaje?","language":"es","relevant_chunk_ids":["deductions"]}
+{"id":"es-05","question":"¿Cómo pago impuestos pendientes?","language":"es","relevant_chunk_ids":["payment"]}
+{"id":"es-06","question":"¿Qué es el impuesto sobre el patrimonio?","language":"es","relevant_chunk_ids":["wealth"]}
+{"id":"es-07","question":"¿Cómo declaro ingresos extranjeros?","language":"es","relevant_chunk_ids":["foreign-income"]}
+{"id":"es-08","question":"¿Qué documentos prueban las deducciones?","language":"es","relevant_chunk_ids":["deductions"]}
+{"id":"es-09","question":"¿Cómo recurro una liquidación?","language":"es","relevant_chunk_ids":["appeal"]}
+{"id":"es-10","question":"¿Cómo actualizo mi dirección?","language":"es","relevant_chunk_ids":["personal-details"]}
+{"id":"es-11","question":"¿Qué es el régimen PAYE?","language":"es","relevant_chunk_ids":["paye"]}
+{"id":"es-12","question":"¿Cómo declaro alquileres?","language":"es","relevant_chunk_ids":["rental"]}
+{"id":"es-13","question":"¿Cuándo pago impuesto anticipado?","language":"es","relevant_chunk_ids":["advance-tax"]}
+{"id":"es-14","question":"¿Dónde encuentro mi liquidación fiscal?","language":"es","relevant_chunk_ids":["assessment"]}
+{"id":"es-15","question":"¿Puedo deducir cuidado infantil?","language":"es","relevant_chunk_ids":["deductions"]}
+{"id":"es-16","question":"¿Cómo se grava el salario?","language":"es","relevant_chunk_ids":["income"]}
