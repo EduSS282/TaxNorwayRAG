@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 
 from taxguide.cli.chunk import chunk
+from taxguide.cli.retrieve import retrieve
 from taxguide.config.loader import load_config
 from taxguide.config.models import AppConfig
 from taxguide.domain.exceptions import TaxguideError
@@ -15,6 +16,7 @@ from taxguide.sources.local import LocalHtmlSource
 
 app = typer.Typer(no_args_is_help=True)
 app.command(name="chunk")(chunk)
+app.command(name="retrieve")(retrieve)
 
 
 def _run(
