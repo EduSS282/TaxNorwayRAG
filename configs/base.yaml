@@ -9,5 +9,18 @@ ingestion:
   parser: skatteetaten
   preserve_links: true
   preserve_headings: true
+crawler:
+  user_agent: TaxGuideNorwayCrawler/0.1
+  connect_timeout: 10.0
+  read_timeout: 20.0
+  max_retries: 2
+  request_delay: 0.75
+  max_response_bytes: 5000000
+  max_pages: 50
+  max_depth: 2
+  allowed_hosts:
+    - www.skatteetaten.no
+    - skatteetaten.no
+  allowed_path_prefixes: []
 logging:
   level: INFO

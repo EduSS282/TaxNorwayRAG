@@ -20,3 +20,27 @@ class EmptyDocumentError(ParseError):
 
 class InvalidConfigurationError(TaxguideError):
     pass
+
+
+class CrawlerError(TaxguideError):
+    """Base error for safe remote document acquisition."""
+
+
+class DisallowedDomainError(CrawlerError):
+    pass
+
+
+class RobotsDisallowedError(CrawlerError):
+    pass
+
+
+class UnsupportedContentTypeError(CrawlerError):
+    pass
+
+
+class FetchError(CrawlerError):
+    pass
+
+
+class ResponseTooLargeError(FetchError):
+    pass
