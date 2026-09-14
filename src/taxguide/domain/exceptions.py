@@ -44,3 +44,15 @@ class FetchError(CrawlerError):
 
 class ResponseTooLargeError(FetchError):
     pass
+
+
+class CorpusError(TaxguideError):
+    """A manifest-driven corpus build could not complete safely."""
+
+
+class EmbeddingError(TaxguideError):
+    """An embedding provider returned an unusable result or could not be reached."""
+
+
+class VectorStoreError(TaxguideError):
+    """A vector-store request was rejected or could not be completed."""

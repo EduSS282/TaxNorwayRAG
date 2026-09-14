@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from taxguide.config.loader import load_config
+from taxguide.config.models import AppConfig
 from taxguide.domain.exceptions import InvalidConfigurationError
 
 
@@ -42,6 +43,29 @@ def test_base_config_loads_without_overlay():
     assert config.project.name == "taxguide-norway"
     assert config.ingestion.parser == "skatteetaten"
     assert config.paths.normalized_data == Path("data/normalized")
+    assert config.corpus.embedding_provider == "ollama"
+    assert config.corpus.embedding_model == "qwen3-embedding:0.6b"
+    assert config.retrieval.default_mode == "dense"
+    assert config.retrieval.candidate_limit == 10
+    assert config.retrieval.reranker_provider == "llamacpp"
+    assert config.retrieval.reranker_base_url == "http://localhost:8001"
+    assert AppConfig().retrieval.candidate_limit == config.retrieval.candidate_limit
+
+
+def test_invalid_embedding_provider_fails_validation(tmp_path):
+    path = tmp_path / "invalid-provider.yaml"
+    path.write_text("corpus: {embedding_provider: remote}", encoding="utf-8")
+
+    with pytest.raises(InvalidConfigurationError, match="embedding_provider"):
+        load_config(path)
+
+
+def test_invalid_reranker_provider_fails_validation(tmp_path):
+    path = tmp_path / "invalid-reranker-provider.yaml"
+    path.write_text("retrieval: {reranker_provider: unknown}", encoding="utf-8")
+
+    with pytest.raises(InvalidConfigurationError, match="reranker_provider"):
+        load_config(path)
 
 
 def test_overlay_preserves_siblings_and_accepts_false(tmp_path):

@@ -32,7 +32,7 @@ class SentenceTransformerModel(Protocol):
 
 def _load_sentence_transformer(model_id: str) -> SentenceTransformerModel:
     try:
-        from sentence_transformers import SentenceTransformer  # type: ignore[import-not-found]
+        from sentence_transformers import SentenceTransformer
     except ImportError as error:
         message = (
             "QwenEmbedder requires the optional 'sentence-transformers' dependency. "

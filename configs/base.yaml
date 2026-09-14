@@ -22,5 +22,26 @@ crawler:
     - www.skatteetaten.no
     - skatteetaten.no
   allowed_path_prefixes: []
+corpus:
+  crawl_manifest_directory: data/manifests/crawl
+  raw_directory: data/raw/skatteetaten
+  report_directory: data/manifests/corpus
+  chunk_strategy: structural
+  max_tokens: 512
+  overlap_tokens: 0
+  embedding_provider: ollama
+  embedding_model: qwen3-embedding:0.6b
+  embedding_base_url: http://localhost:11434
+  embedding_timeout: 120.0
+  embedding_batch_size: 32
+  qdrant_url: http://localhost:6333
+  qdrant_collection: taxguide_chunks_temporal_v1
+retrieval:
+  default_mode: dense
+  candidate_limit: 10
+  reranker_provider: llamacpp
+  reranker_model: Qwen/Qwen3-Reranker-0.6B
+  reranker_base_url: http://localhost:8001
+  reranker_timeout: 30.0
 logging:
   level: INFO
