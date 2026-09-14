@@ -5,6 +5,7 @@ import re
 from collections import Counter
 
 from taxguide.domain.models import Chunk
+from taxguide.retrieval.filters import RetrievalFilter, filter_results
 from taxguide.vectorstores.base import ScoredChunk
 
 _TOKEN = re.compile(r"\w+", re.UNICODE)
@@ -24,7 +25,9 @@ class SparseRetriever:
         self._average_length = total_terms / len(chunks) if chunks else 0
         self._document_frequency = Counter(term for terms in self._terms for term in terms)
 
-    def retrieve(self, query: str, *, limit: int = 5) -> list[ScoredChunk]:
+    def retrieve(
+        self, query: str, *, limit: int = 5, filters: RetrievalFilter | None = None
+    ) -> list[ScoredChunk]:
         if not query.strip():
             raise ValueError("query must not be empty")
         if limit <= 0:
@@ -34,6 +37,8 @@ class SparseRetriever:
             ScoredChunk(chunk=chunk, score=self._score(terms, query_terms))
             for chunk, terms in zip(self._chunks, self._terms, strict=True)
         ]
+        if filters is not None:
+            results = filter_results(results, filters)
         ranked = sorted(
             (result for result in results if result.score > 0),
             key=lambda item: item.score,

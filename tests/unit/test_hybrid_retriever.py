@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from taxguide.domain.models import Chunk, ChunkMetadata
+from taxguide.retrieval.filters import RetrievalFilter
 from taxguide.retrieval.hybrid import HybridRetriever
 from taxguide.vectorstores.base import ScoredChunk
 
@@ -27,6 +28,24 @@ def test_hybrid_retriever_fuses_dense_and_sparse_rankings() -> None:
     )
 
     assert [item.chunk.id for item in hybrid.retrieve("tax deadline")] == [shared.id, dense_only.id]
+
+
+def test_hybrid_retriever_passes_the_year_filter_to_both_branches() -> None:
+    received: list[RetrievalFilter | None] = []
+
+    class FilteredStub:
+        def retrieve(
+            self, query: str, *, limit: int = 5, filters: RetrievalFilter | None = None
+        ) -> list[ScoredChunk]:
+            received.append(filters)
+            return [ScoredChunk(chunk=_chunk("a"), score=1)]
+
+    results = HybridRetriever(FilteredStub(), FilteredStub()).retrieve(
+        "tax deadline", filters=RetrievalFilter(tax_year=2025)
+    )
+
+    assert results
+    assert received == [RetrievalFilter(tax_year=2025)] * 2
 
 
 def _chunk(identity: str) -> Chunk:

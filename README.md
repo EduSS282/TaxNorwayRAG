@@ -92,6 +92,8 @@ and type checking. Pre-commit hooks check Ruff rules, formatting, YAML, and whit
 
 See [architecture](docs/architecture.md) and [ingestion](docs/ingestion.md) for details.
 
+For dense, sparse, hybrid, and reranked command examples, see [retrieval](docs/retrieval.md).
+
 ## Current follow-on work
 
 Phase 2 adds fixed-token, recursive, and structural chunking over the normalized
