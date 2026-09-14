@@ -5,6 +5,7 @@ from typing import Annotated
 import typer
 
 from taxguide.cli.chunk import chunk
+from taxguide.cli.corpus import app as corpus_app
 from taxguide.cli.crawl import crawl
 from taxguide.cli.retrieve import retrieve
 from taxguide.config.loader import load_config
@@ -19,6 +20,7 @@ app = typer.Typer(no_args_is_help=True)
 app.command(name="chunk")(chunk)
 app.command(name="crawl")(crawl)
 app.command(name="retrieve")(retrieve)
+app.add_typer(corpus_app, name="corpus")
 
 
 def _run(

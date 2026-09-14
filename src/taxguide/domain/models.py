@@ -69,6 +69,7 @@ class Section(DomainModel):
 class ParsedDocument(SourceIdentity):
     title: str | None = None
     language: str | None = None
+    tax_year: int | None = Field(default=None, ge=1900, le=2100)
     sections: list[Section]
 
 

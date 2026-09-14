@@ -20,6 +20,7 @@ def build_chunks(
         source_url=document.source_url,
         source_domain=document.source_domain,
         language=document.language,
+        tax_year=document.tax_year,
         retrieved_at=document.retrieved_at,
         document_content_hash=document.content_hash,
     )
