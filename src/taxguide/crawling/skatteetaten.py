@@ -82,7 +82,7 @@ class SkatteetatenCrawler:
             visited.add(url)
             attempts += 1
             try:
-                # self._check_robots(url)
+                self._check_robots(url)
                 response = self.http.fetch(url)
                 self._validate(response.url)
                 visited.add(normalize_url(response.url))

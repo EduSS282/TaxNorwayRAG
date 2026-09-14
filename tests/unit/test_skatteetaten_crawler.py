@@ -47,7 +47,7 @@ def test_external_seed_is_rejected() -> None:
         crawler.crawl(CrawlRequest(url="https://example.com/"))
 
 
-def test_robots_allow_and_disallow_are_cached() -> None:
+def test_robots_allow_and_disallow_are_cached(tmp_path: Path) -> None:
     pages = {
         f"{BASE}/robots.txt": robots("User-agent: *\nDisallow: /private\nAllow: /"),
         f"{BASE}/public": response(
@@ -55,7 +55,7 @@ def test_robots_allow_and_disallow_are_cached() -> None:
         ),
     }
     http = FakeHttp(pages)
-    result = SkatteetatenCrawler(http).crawl(
+    result = SkatteetatenCrawler(http, FileCrawlArtifactRepository(tmp_path)).crawl(
         CrawlRequest(url=f"{BASE}/public", max_pages=2, max_depth=1)
     )
     assert result.fetched == 1
