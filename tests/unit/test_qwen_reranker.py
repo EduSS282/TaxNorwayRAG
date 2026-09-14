@@ -7,7 +7,7 @@ from taxguide.reranking.qwen import QwenReranker
 class FakeCrossEncoder:
     def predict(self, sentences: list[tuple[str, str]], *, show_progress_bar: bool) -> list[float]:
         assert show_progress_bar is False
-        return [float(index) for index, _ in enumerate(sentences)]
+        return [-8.9375, -2.0]
 
 
 def test_qwen_reranker_loads_lazily_and_sorts_candidates() -> None:
@@ -15,10 +15,13 @@ def test_qwen_reranker_loads_lazily_and_sorts_candidates() -> None:
     reranker = QwenReranker(model_factory=lambda _: model)
     first, second = _chunk("a"), _chunk("b")
 
-    assert [item.chunk.id for item in reranker.rank("deadline", [first, second])] == [
+    results = reranker.rank("deadline", [first, second])
+
+    assert [item.chunk.id for item in results] == [
         second.id,
         first.id,
     ]
+    assert [item.score for item in results] == [-2.0, -8.9375]
 
 
 def _chunk(identity: str) -> Chunk:

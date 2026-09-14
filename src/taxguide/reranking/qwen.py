@@ -17,7 +17,7 @@ class CrossEncoderModel(Protocol):
 
 def _load_cross_encoder(model_id: str) -> CrossEncoderModel:
     try:
-        from sentence_transformers import CrossEncoder  # type: ignore[import-not-found]
+        from sentence_transformers import CrossEncoder
     except ImportError as error:
         raise RuntimeError(
             "QwenReranker requires the optional 'sentence-transformers' dependency."

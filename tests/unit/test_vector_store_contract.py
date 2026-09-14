@@ -1,4 +1,8 @@
 from datetime import UTC, datetime
+from math import inf, nan
+
+import pytest
+from pydantic import ValidationError
 
 from taxguide.domain.models import Chunk, ChunkMetadata
 from taxguide.embeddings.base import EmbeddingBatch
@@ -18,6 +22,17 @@ def test_vector_store_contract_allows_independent_adapters() -> None:
     store: VectorStore = InMemoryStore()
     store.upsert([_chunk()], [(0.1, 0.2)])
     assert store.search((0.1, 0.2), limit=1) == []
+
+
+@pytest.mark.parametrize("score", [1.0, 0.0, -8.9375])
+def test_scored_chunk_accepts_finite_ranking_scores(score: float) -> None:
+    assert ScoredChunk(chunk=_chunk(), score=score).score == score
+
+
+@pytest.mark.parametrize("score", [nan, inf, -inf])
+def test_scored_chunk_rejects_non_finite_scores(score: float) -> None:
+    with pytest.raises(ValidationError):
+        ScoredChunk(chunk=_chunk(), score=score)
 
 
 def _chunk() -> Chunk:

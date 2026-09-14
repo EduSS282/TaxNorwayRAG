@@ -1,18 +1,21 @@
 """Provider-independent vector index contract."""
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import Field
 
 from taxguide.domain.models import Chunk, DomainModel
 from taxguide.embeddings.base import Embedding, EmbeddingBatch
 
+if TYPE_CHECKING:
+    from taxguide.retrieval.filters import RetrievalFilter
+
 
 class ScoredChunk(DomainModel):
-    """A chunk returned from vector search with its similarity score."""
+    """A chunk with a finite ranking score; higher scores rank ahead of lower scores."""
 
     chunk: Chunk
-    score: float = Field(ge=0)
+    score: float = Field(allow_inf_nan=False)
 
 
 class VectorStore(Protocol):
@@ -20,4 +23,6 @@ class VectorStore(Protocol):
 
     def upsert(self, chunks: list[Chunk], embeddings: EmbeddingBatch) -> None: ...
 
-    def search(self, query: Embedding, *, limit: int) -> list[ScoredChunk]: ...
+    def search(
+        self, query: Embedding, *, limit: int, filters: "RetrievalFilter | None" = None
+    ) -> list[ScoredChunk]: ...
