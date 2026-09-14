@@ -38,6 +38,66 @@ def test_parser_preserves_heading_levels_and_lists(raw):
     assert doc.sections[3].paragraphs[1].text == "Field | Description\nBank | Name"
 
 
+def test_parser_extracts_topic_hub_cards_and_excludes_global_chrome(raw):
+    page = LocalHtmlSource().load(
+        Path("tests/fixtures/html/skatteetaten_topic_hub.html"), raw.source_url
+    )
+
+    doc = PARSER.parse(page)
+
+    assert doc.title == "Children"
+    assert [section.heading for section in doc.sections] == [
+        "Children",
+        "Tax regulations for childcare in a private home",
+        "Child support",
+    ]
+    assert [paragraph.text for paragraph in doc.sections[1].paragraphs] == [
+        "Parents, childminders and nannies can find the tax regulations for paid childcare here."
+    ]
+    assert [link.model_dump() for link in doc.sections[1].links] == [
+        {
+            "text": "Tax regulations for childcare in a private home",
+            "href": "https://www.skatteetaten.no/en/person/taxes/children/childcare/",
+        }
+    ]
+    assert [paragraph.text for paragraph in doc.sections[2].paragraphs] == [
+        "Child support is not deductible and is not taxable income for its recipient."
+    ]
+    assert doc.sections[2].links[0].text == "Child support"
+    assert all(len(section.links) == 1 for section in doc.sections[1:])
+    serialized = doc.model_dump_json()
+    assert all(
+        noise not in serialized
+        for noise in (
+            "For persons",
+            "Search",
+            "Log in",
+            "Global related link",
+            "Was this page useful?",
+            "Contact us",
+        )
+    )
+
+
+def test_article_fixture_parses_with_unchanged_structure(raw):
+    doc = PARSER.parse(raw)
+
+    assert [section.model_dump(mode="json") for section in doc.sections] == [
+        {
+            "heading": "Tax return",
+            "level": 1,
+            "paragraphs": [{"text": "Check your information.", "kind": "text"}],
+            "links": [],
+        },
+        {
+            "heading": "Bank and loans",
+            "level": 2,
+            "paragraphs": [{"text": "Read the guidance.", "kind": "text"}],
+            "links": [{"text": "guidance", "href": "https://www.skatteetaten.no/en/help"}],
+        },
+    ]
+
+
 def test_parser_removes_navigation_scripts_footer_and_hidden_content(raw):
     page = LocalHtmlSource().load(
         Path("tests/fixtures/html/skatteetaten_noise.html"), raw.source_url
@@ -177,3 +237,28 @@ def test_unwrapped_main_text_and_inline_markup_are_preserved(raw):
         "After text.",
     ]
     assert [link.href for link in doc.sections[0].links] == ["https://www.skatteetaten.no/help"]
+
+
+def test_parser_preserves_word_boundaries_across_inline_markup(raw):
+    page = LocalHtmlSource().load(
+        Path("tests/fixtures/html/skatteetaten_inline_whitespace.html"), raw.source_url
+    )
+
+    document = PARSER.parse(page)
+
+    assert [paragraph.text for paragraph in document.sections[0].paragraphs] == [
+        "Calculate the deduction.",
+        "You must also be able to present documentation.",
+        "Childcare applies only during the school holidays.",
+        "Foreign institutions that are approved may qualify.",
+        "Report Norway in your tax return.",
+        "Deadline (31 December).",
+        "Amounts: NOK 25,000 and 10%.",
+        "Keep a tax-return copy and income/expense records.",
+        "- Day care\n- Child minder\n- After-school care",
+    ]
+    assert [link.text for link in document.sections[0].links] == [
+        "the deduction",
+        "in your tax return",
+        "care",
+    ]

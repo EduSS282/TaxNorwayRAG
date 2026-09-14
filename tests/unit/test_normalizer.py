@@ -8,6 +8,7 @@ from taxguide.domain.exceptions import EmptyDocumentError, ParseError
 from taxguide.domain.models import Link, Paragraph, ParsedDocument, Section
 from taxguide.ingestion.normalizer import Normalizer
 from taxguide.ingestion.skatteetaten_parser import SkatteetatenHtmlParser
+from taxguide.sources.local import LocalHtmlSource
 
 
 def test_normalizer_whitespace_and_unicode(raw):
@@ -220,3 +221,17 @@ def test_blank_heading_is_removed_without_discarding_paragraph(independent_parse
     assert document.sections[0].heading is None
     assert document.sections[0].level is None
     assert document.plain_text == "Tax guide\n\nKeep this text."
+
+
+def test_normalizer_is_idempotent_after_inline_whitespace_extraction(raw):
+    page = LocalHtmlSource().load(
+        Path("tests/fixtures/html/skatteetaten_inline_whitespace.html"), raw.source_url
+    )
+    parsed = SkatteetatenHtmlParser().parse(page)
+
+    normalized = Normalizer().normalize(parsed)
+
+    assert "Calculate the deduction." in normalized.plain_text
+    assert "must also be able to present" in normalized.plain_text
+    assert "only during the school holidays" in normalized.plain_text
+    assert Normalizer().normalize(normalized) == normalized

@@ -9,22 +9,41 @@ from taxguide.domain.exceptions import EmptyDocumentError, ParseError, Unsupport
 from taxguide.domain.models import Link, Paragraph, ParsedDocument, RawDocument, Section
 
 logger = logging.getLogger(__name__)
+TEXT_NODE_SEPARATOR = "\ue000"
 NOISE = (
-    "nav, header, footer, script, style, svg, noscript, template, form, button, input, "
+    "nav:not(.nav-transport), header, footer, script, style, svg, noscript, template, "
+    "form, button, input, "
     "select, textarea, option, "
-    '[hidden], [aria-hidden="true"], [role="navigation"], [role="search"], '
+    '[hidden], [aria-hidden="true"], [role="navigation"]:not(.nav-transport), '
+    '[role="search"], '
     ".breadcrumb, .breadcrumbs, .cookie-banner, #cookie-banner, .cookie-consent"
 )
 
 
+def _join_text_fragments(fragments: list[str]) -> str:
+    """Join adjacent DOM text fragments without separating punctuation from prose."""
+    text = ""
+    for fragment in fragments:
+        if text and fragment and text[-1].isalnum() and fragment[0].isalnum():
+            text += " "
+        text += fragment
+    return text
+
+
 def _text(node: Node) -> str:
-    # Preserve inline word boundaries as authored, including punctuation around links.
+    # Selectolax does not retain an omitted space between adjacent DOM text nodes. Use a
+    # separator to retain that structural boundary, then only insert prose spacing where
+    # both sides are alphanumeric. Punctuation remains attached to its preceding token.
     tree = HTMLParser(node.html or "")
     for br in tree.css("br"):
         br.replace_with("\n")
     for block in tree.css("p, div, blockquote, pre"):
         block.insert_after("\n")
-    return tree.body.text(separator="", strip=False).strip() if tree.body else ""
+    if tree.body is None:
+        return ""
+    extracted = tree.body.text(separator=TEXT_NODE_SEPARATOR, strip=False)
+    fragments = extracted.split(TEXT_NODE_SEPARATOR)
+    return _join_text_fragments(fragments).strip()
 
 
 def _list(node: Node, depth: int = 0) -> str:
@@ -116,7 +135,10 @@ class SkatteetatenHtmlParser:
         ):
             for root in tree.css(selector):
                 sections = self._sections(root, document.source_url)
-                if not any(p.text.strip() for s in sections for p in s.paragraphs):
+                if not any(
+                    section.links or any(p.text.strip() for p in section.paragraphs)
+                    for section in sections
+                ):
                     continue
                 h1 = root.css_first("h1") or tree.css_first("h1")
                 title = _text(h1) if h1 else fallback_title
@@ -147,6 +169,33 @@ class SkatteetatenHtmlParser:
                 if urlsplit(href).scheme in {"http", "https", "mailto"}:
                     links.append(Link(text=_text(anchor), href=href))
 
+        def visit_topic_cards(node: Node) -> None:
+            nonlocal heading, level
+            for anchor in node.css("li > a[href]"):
+                title_node = anchor.css_first(".nav-page-header")
+                if title_node is None:
+                    continue
+                title = _text(title_node)
+                target = anchor.attributes.get("href")
+                if not title or target is None:
+                    continue
+                href = urljoin(source_url, target.strip())
+                if urlsplit(href).scheme not in {"http", "https", "mailto"}:
+                    continue
+
+                flush()
+                if self.preserve_headings:
+                    heading = title
+                    level = int(title_node.tag[1]) if re.fullmatch(r"h[1-6]", title_node.tag) else 2
+                else:
+                    paragraphs.append(Paragraph(text=title))
+                for teaser in anchor.css(".nav-teaser-text"):
+                    text = _text(teaser)
+                    if text:
+                        paragraphs.append(Paragraph(text=text))
+                if self.preserve_links:
+                    links.append(Link(text=title, href=href))
+
         def flush() -> None:
             if heading or paragraphs or links:
                 sections.append(
@@ -160,7 +209,11 @@ class SkatteetatenHtmlParser:
         def visit(node: Node) -> None:
             nonlocal heading, level
             tag = node.tag
-            if tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            classes = (node.attributes.get("class") or "").split()
+            if tag == "nav" and "nav-transport" in classes:
+                visit_topic_cards(node)
+                return
+            elif tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
                 if self.preserve_headings:
                     flush()
                     heading, level = _text(node), int(tag[1])
@@ -181,7 +234,7 @@ class SkatteetatenHtmlParser:
                 inline: list[str] = []
 
                 def flush_inline() -> None:
-                    text = "".join(inline).strip()
+                    text = _join_text_fragments(inline).strip()
                     if text:
                         paragraphs.append(Paragraph(text=text))
                     inline.clear()
@@ -208,8 +261,7 @@ class SkatteetatenHtmlParser:
                         elif child.tag == "br":
                             inline.append("\n")
                         else:
-                            # Keep surrounding whitespace until the complete inline run is joined.
-                            inline.append(child.text(separator="", strip=False))
+                            inline.append(_text(child))
                             collect_links(child)
                     else:
                         flush_inline()
