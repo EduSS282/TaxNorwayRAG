@@ -67,6 +67,16 @@ class RetrievalConfig(ConfigModel):
     reranker_timeout: float = Field(default=120.0, gt=0)
 
 
+class GenerationConfig(ConfigModel):
+    """Configuration for the constrained local generation profile."""
+
+    model_profile: Literal["portable", "balanced", "quality"] = "portable"
+    model: str = Field(default="Qwen/Qwen3-4B-Instruct-2507", min_length=1)
+    temperature: float = Field(default=0.1, ge=0, le=2)
+    max_tokens: int = Field(default=1000, ge=1)
+    structured_output: bool = True
+
+
 class AppConfig(ConfigModel):
     project: ProjectConfig = Field(default_factory=ProjectConfig)
     paths: PathConfig = Field(default_factory=PathConfig)
@@ -74,4 +84,5 @@ class AppConfig(ConfigModel):
     crawler: CrawlerConfig = Field(default_factory=CrawlerConfig)
     corpus: CorpusConfig = Field(default_factory=CorpusConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
+    generation: GenerationConfig = Field(default_factory=GenerationConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)

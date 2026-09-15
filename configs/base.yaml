@@ -43,5 +43,11 @@ retrieval:
   reranker_model: Qwen/Qwen3-Reranker-0.6B
   reranker_base_url: http://localhost:8001
   reranker_timeout: 30.0
+generation:
+  model_profile: portable
+  model: Qwen/Qwen3-4B-Instruct-2507
+  temperature: 0.1
+  max_tokens: 1000
+  structured_output: true
 logging:
   level: INFO

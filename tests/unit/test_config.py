@@ -49,7 +49,13 @@ def test_base_config_loads_without_overlay():
     assert config.retrieval.candidate_limit == 10
     assert config.retrieval.reranker_provider == "llamacpp"
     assert config.retrieval.reranker_base_url == "http://localhost:8001"
+    assert config.generation.model_profile == "portable"
+    assert config.generation.model == "Qwen/Qwen3-4B-Instruct-2507"
+    assert config.generation.temperature == 0.1
+    assert config.generation.max_tokens == 1000
+    assert config.generation.structured_output is True
     assert AppConfig().retrieval.candidate_limit == config.retrieval.candidate_limit
+    assert AppConfig().generation.model == config.generation.model
 
 
 def test_invalid_embedding_provider_fails_validation(tmp_path):
@@ -65,6 +71,23 @@ def test_invalid_reranker_provider_fails_validation(tmp_path):
     path.write_text("retrieval: {reranker_provider: unknown}", encoding="utf-8")
 
     with pytest.raises(InvalidConfigurationError, match="reranker_provider"):
+        load_config(path)
+
+
+@pytest.mark.parametrize(
+    "content, message",
+    [
+        ("generation: {model_profile: remote}", "model_profile"),
+        ("generation: {model: ''}", "model"),
+        ("generation: {temperature: 2.1}", "temperature"),
+        ("generation: {max_tokens: 0}", "max_tokens"),
+    ],
+)
+def test_invalid_generation_profile_fails_validation(tmp_path, content, message):
+    path = tmp_path / "invalid-generation.yaml"
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(InvalidConfigurationError, match=message):
         load_config(path)
 
 
