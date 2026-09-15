@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 import pytest
 
 from taxguide.domain.models import Chunk, ChunkMetadata
-from taxguide.retrieval.sparse import SparseRetriever
 from taxguide.retrieval.filters import RetrievalFilter
+from taxguide.retrieval.sparse import SparseRetriever
 
 
 def test_sparse_retriever_ranks_exact_lexical_matches() -> None:
