@@ -152,9 +152,7 @@ def test_annual_versions_keep_distinct_identity_through_vector_indexing(tmp_path
 
     chunks = [chunk for batch in store.batches for chunk in batch]
     assert report.processed == 3
-    assert {chunk.document_id for chunk in chunks} == {
-        item.document_id for item in manifests
-    }
+    assert {chunk.document_id for chunk in chunks} == {item.document_id for item in manifests}
     assert {chunk.metadata.source_url for chunk in chunks} == set(urls)
     assert {chunk.metadata.tax_year for chunk in chunks} == {2025, 2026, None}
     assert len({chunk.id for chunk in chunks}) == 3

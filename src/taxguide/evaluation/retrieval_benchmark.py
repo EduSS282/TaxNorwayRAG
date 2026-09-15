@@ -120,10 +120,7 @@ def benchmark_row(
 
 
 def format_report(rows: Sequence[BenchmarkRow]) -> str:
-    header = (
-        "Pipeline | R@1 | R@5 | R@10 | S@1 | S@5 | MRR | "
-        "nDCG@5 | nDCG@10 | mean latency (s)"
-    )
+    header = "Pipeline | R@1 | R@5 | R@10 | S@1 | S@5 | MRR | nDCG@5 | nDCG@10 | mean latency (s)"
     lines = [header, "--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---:"]
     for row in rows:
         recall_10 = _metric_cell(row.recall_at_10)
@@ -148,17 +145,13 @@ def format_reranker_regressions(
     if len(queries) != len(hybrid_rankings) or len(queries) != len(reranked_rankings):
         raise ValueError("queries and diagnostic rankings must have the same length")
     lines = [f"Reranker regressions versus Hybrid@{k}:"]
-    for query, hybrid, reranked in zip(
-        queries, hybrid_rankings, reranked_rankings, strict=True
-    ):
+    for query, hybrid, reranked in zip(queries, hybrid_rankings, reranked_rankings, strict=True):
         gold = {item.source_url for item in query.relevant}
         hybrid_urls = unique_ranked_urls(hybrid)[:k]
         reranked_urls = unique_ranked_urls(reranked)[:k]
         hybrid_rank = _first_relevant_rank(hybrid_urls, gold)
         reranked_rank = _first_relevant_rank(reranked_urls, gold)
-        if hybrid_rank is None or (
-            reranked_rank is not None and reranked_rank <= hybrid_rank
-        ):
+        if hybrid_rank is None or (reranked_rank is not None and reranked_rank <= hybrid_rank):
             continue
         lines.extend(
             [

@@ -35,7 +35,9 @@ class FileCrawlManifestRepository:
         try:
             paths = sorted(self.directory.glob("*.json"))
             for path in paths:
-                manifests.append(CrawlManifest.model_validate_json(path.read_text(encoding="utf-8")))
+                manifests.append(
+                    CrawlManifest.model_validate_json(path.read_text(encoding="utf-8"))
+                )
         except (OSError, UnicodeError, ValidationError) as exc:
             raise CorpusError(f"Cannot read crawl manifest in {self.directory}: {exc}") from exc
         return manifests

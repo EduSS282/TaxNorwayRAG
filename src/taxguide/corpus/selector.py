@@ -71,9 +71,7 @@ def path_matches_prefix(path: str, prefixes: tuple[str, ...]) -> bool:
 
 
 class ManifestCorpusSelector:
-    def select(
-        self, manifests: Iterable[CrawlManifest], filters: CorpusFilters
-    ) -> CorpusSelection:
+    def select(self, manifests: Iterable[CrawlManifest], filters: CorpusFilters) -> CorpusSelection:
         selected: list[CrawlManifest] = []
         counts = {
             "scanned": 0,

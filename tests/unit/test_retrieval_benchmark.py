@@ -26,7 +26,9 @@ def test_versioned_gold_dataset_is_valid_and_multilingual() -> None:
 
 def test_dataset_rejects_duplicate_ids_invalid_urls_and_invalid_grades() -> None:
     row = {
-        "id": "same", "query": "Question", "language": "en",
+        "id": "same",
+        "query": "Question",
+        "language": "en",
         "relevant": [{"source_url": "https://example.com/a", "relevance": 3}],
     }
     with pytest.raises(ValidationError):
@@ -136,7 +138,13 @@ def test_irrelevant_duplicates_do_not_consume_url_level_ranks() -> None:
     dataset = _dataset_with_two_gold_urls()
     row = benchmark_row(
         "Dense",
-        [["https://example.com/irrelevant", "https://example.com/irrelevant/", "https://example.com/a"]],
+        [
+            [
+                "https://example.com/irrelevant",
+                "https://example.com/irrelevant/",
+                "https://example.com/a",
+            ]
+        ],
         dataset.queries,
         [0.1],
     )

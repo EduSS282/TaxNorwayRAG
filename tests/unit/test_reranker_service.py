@@ -20,9 +20,10 @@ def test_service_loads_model_once_and_returns_raw_negative_logits() -> None:
 
     async def exercise_service() -> tuple[httpx.Response, httpx.Response]:
         transport = httpx.ASGITransport(app=app)
-        async with app.router.lifespan_context(app), httpx.AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=transport, base_url="http://testserver") as client,
+        ):
             health = await client.get("/health")
             response = await client.post(
                 "/rerank", json={"query": "deadline", "documents": ["first", "second"]}
@@ -42,9 +43,10 @@ def test_service_rejects_malformed_requests() -> None:
 
     async def exercise_service() -> httpx.Response:
         transport = httpx.ASGITransport(app=app)
-        async with app.router.lifespan_context(app), httpx.AsyncClient(
-            transport=transport, base_url="http://testserver"
-        ) as client:
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=transport, base_url="http://testserver") as client,
+        ):
             return await client.post("/rerank", json={"query": "", "documents": []})
 
     response = asyncio.run(exercise_service())

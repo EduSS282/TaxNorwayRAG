@@ -30,9 +30,7 @@ def test_retrieve_help_is_available_without_optional_runtime_dependencies() -> N
 
 
 @pytest.mark.parametrize("year", [2025, 2026])
-def test_retrieve_cli_passes_a_tax_year_filter(
-    monkeypatch: pytest.MonkeyPatch, year: int
-) -> None:
+def test_retrieve_cli_passes_a_tax_year_filter(monkeypatch: pytest.MonkeyPatch, year: int) -> None:
     received: list[RetrievalFilter | None] = []
 
     class EmptyRetriever:

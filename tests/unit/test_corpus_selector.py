@@ -55,7 +55,9 @@ def test_url_prefixes_use_path_or_semantics_and_normalize_slashes() -> None:
 
 
 def test_effective_url_prefers_allowed_canonical_then_final_then_original() -> None:
-    canonical = manifest("canonical", canonical="https://skatteetaten.no/en/person/taxes/canonical/")
+    canonical = manifest(
+        "canonical", canonical="https://skatteetaten.no/en/person/taxes/canonical/"
+    )
     assert effective_url(canonical) == canonical.canonical_url
     off_domain = manifest("final", canonical="https://example.com/not-trusted")
     assert effective_url(off_domain) == off_domain.final_url

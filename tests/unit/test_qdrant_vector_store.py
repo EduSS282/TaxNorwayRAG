@@ -84,9 +84,7 @@ def test_qdrant_store_loads_all_persisted_chunk_payloads() -> None:
 
     class ScrollClient(FakeQdrantClient):
         def scroll(self, **_: Any) -> tuple[list[FakeScoredPoint], None]:
-            point = FakeScoredPoint(
-                {**chunk.model_dump(mode="json"), "chunk_id": chunk.id}, 0
-            )
+            point = FakeScoredPoint({**chunk.model_dump(mode="json"), "chunk_id": chunk.id}, 0)
             return [point], None
 
     assert QdrantVectorStore(ScrollClient()).load_chunks() == [chunk]

@@ -21,11 +21,14 @@ def test_generator_contract_is_replaceable() -> None:
     generator: Generator = EchoGenerator()
 
     assert generator.model_id == "test"
-    assert generator.generate(
-        [
-            {"role": "system", "content": "Use the supplied evidence."},
-            {"role": "user", "content": "What is the deadline?"},
-        ],
-        temperature=0.1,
-        max_tokens=20,
-    ) == "What is the deadline?"
+    assert (
+        generator.generate(
+            [
+                {"role": "system", "content": "Use the supplied evidence."},
+                {"role": "user", "content": "What is the deadline?"},
+            ],
+            temperature=0.1,
+            max_tokens=20,
+        )
+        == "What is the deadline?"
+    )
