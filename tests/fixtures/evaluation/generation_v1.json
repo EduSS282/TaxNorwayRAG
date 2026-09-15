@@ -1,0 +1,23 @@
+{
+  "version": "v1",
+  "cases": [
+    {
+      "id": "supported-answer",
+      "query": "What does the supplied evidence say about travel deductions?",
+      "reference_answer": "The supplied evidence says documented travel expenses may be deductible.",
+      "evidence": [
+        "Documented travel expenses may be deductible when the statutory conditions are met."
+      ],
+      "expected_citation_ids": ["S1"],
+      "should_abstain": false
+    },
+    {
+      "id": "insufficient-evidence",
+      "query": "Can I claim a deduction in an unspecified situation?",
+      "reference_answer": "There is insufficient evidence to answer safely.",
+      "evidence": [],
+      "expected_citation_ids": [],
+      "should_abstain": true
+    }
+  ]
+}
