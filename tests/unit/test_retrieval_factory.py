@@ -158,7 +158,7 @@ def test_reranked_retriever_reranks_only_year_filtered_candidates() -> None:
             return [ScoredChunk(chunk=item, score=1) for item in items[:limit]]
 
     results = RerankedRetriever(Candidates(), RecordingReranker(), candidate_limit=2).retrieve(
-        "tax deduction", filters=RetrievalFilter(tax_year=2025)
+        "tax deduction", limit=1, filters=RetrievalFilter(tax_year=2025)
     )
 
     assert passed_to_reranker == [matching]
