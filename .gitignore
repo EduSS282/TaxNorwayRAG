@@ -10,4 +10,5 @@ htmlcov/
 dist/
 .env
 data/*/*
+!data/evaluation/retrieval_gold_v1.json
 !data/*/.gitkeep
