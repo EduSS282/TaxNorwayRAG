@@ -1,8 +1,8 @@
 """Token-window chunking used as a deterministic baseline."""
 
+from taxguide.chunking._chunks import build_chunks
 from taxguide.chunking.tokenizer import Tokenizer, WhitespaceTokenizer
-from taxguide.domain.models import Chunk, ChunkMetadata, Document
-from taxguide.ingestion.hashing import hash_text
+from taxguide.domain.models import Chunk, Document
 
 
 class FixedTokenChunker:
@@ -37,30 +37,9 @@ class FixedTokenChunker:
         if len(windows) > 1 and len(windows[-1]) <= self.overlap_tokens:
             windows.pop()
         texts = [self.tokenizer.detokenize(window) for window in windows]
-        identifiers = [
-            hash_text(f"{document.id}:{self.strategy_name}:{index}:{hash_text(text)}")
-            for index, text in enumerate(texts)
-        ]
-        metadata = ChunkMetadata(
-            title=document.title,
-            source_url=document.source_url,
-            source_domain=document.source_domain,
-            language=document.language,
-            retrieved_at=document.retrieved_at,
-            document_content_hash=document.content_hash,
+        return build_chunks(
+            document=document,
+            texts=texts,
+            section_paths=[()] * len(texts),
+            tokenizer=self.tokenizer,
         )
-        return [
-            Chunk(
-                id=identifier,
-                document_id=document.id,
-                text=text,
-                section_path=(),
-                chunk_index=index,
-                token_count=self.tokenizer.count_tokens(text),
-                content_hash=hash_text(text),
-                previous_chunk_id=identifiers[index - 1] if index else None,
-                next_chunk_id=identifiers[index + 1] if index + 1 < len(identifiers) else None,
-                metadata=metadata,
-            )
-            for index, (identifier, text) in enumerate(zip(identifiers, texts, strict=True))
-        ]

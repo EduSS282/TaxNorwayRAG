@@ -81,11 +81,15 @@ def _render_evidence(evidence: ContextEvidence) -> str:
     title = metadata.title or "Untitled source"
     section = " > ".join(chunk.section_path) or "(root)"
     tax_year = str(metadata.tax_year) if metadata.tax_year is not None else "unknown"
+    valid_from = str(metadata.valid_from) if metadata.valid_from is not None else "unknown"
+    valid_to = str(metadata.valid_to) if metadata.valid_to is not None else "open"
     return (
         f"[{evidence.evidence_id}] chunk_id={chunk.id}\n"
         f"title={title}\n"
         f"section={section}\n"
         f"source_url={metadata.source_url}\n"
         f"tax_year={tax_year}\n"
+        f"valid_from={valid_from}\n"
+        f"valid_to={valid_to}\n"
         f"text:\n{chunk.text}"
     )

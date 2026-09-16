@@ -7,10 +7,12 @@ import typer
 
 from taxguide.config.loader import load_config
 from taxguide.config.models import AppConfig
+from taxguide.domain.exceptions import TaxguideError
 from taxguide.embeddings.factory import create_embedder
 from taxguide.retrieval.factory import RetrievalMode, create_retriever
 from taxguide.retrieval.filters import RetrievalFilter
 from taxguide.retrieval.hybrid import Retriever
+from taxguide.retrieval.temporal import TaxYearAwareRetriever
 
 
 def _settings(config: Path | None, overlay: Path | None) -> AppConfig:
@@ -57,12 +59,14 @@ def retrieve(
         selected_candidate_limit = candidate_limit or settings.retrieval.candidate_limit
         if selected_mode == "reranked" and selected_candidate_limit < limit:
             raise ValueError("candidate_limit must be greater than or equal to limit")
-        retriever = build_retriever(
-            settings,
-            mode=selected_mode,
-            qdrant_url=qdrant_url,
-            collection=collection,
-            candidate_limit=selected_candidate_limit,
+        retriever = TaxYearAwareRetriever(
+            build_retriever(
+                settings,
+                mode=selected_mode,
+                qdrant_url=qdrant_url,
+                collection=collection,
+                candidate_limit=selected_candidate_limit,
+            )
         )
         if tax_year is None:
             results = retriever.retrieve(query, limit=limit)
@@ -70,7 +74,7 @@ def retrieve(
             results = retriever.retrieve(
                 query, limit=limit, filters=RetrievalFilter(tax_year=tax_year)
             )
-    except (RuntimeError, ValueError) as error:
+    except (RuntimeError, TaxguideError, ValueError) as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(1) from error
     except Exception as error:

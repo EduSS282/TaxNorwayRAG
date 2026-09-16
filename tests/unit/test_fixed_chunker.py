@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -6,7 +6,7 @@ from taxguide.chunking.fixed import FixedTokenChunker
 from taxguide.domain.models import Document, Paragraph, Section
 
 
-def document(text: str) -> Document:
+def document(text: str, *, tax_year: int | None = None) -> Document:
     return Document(
         id="a" * 64,
         source_url="https://www.skatteetaten.no/en/example",
@@ -17,6 +17,8 @@ def document(text: str) -> Document:
         content_hash="b" * 64,
         title="Tax return",
         language="en",
+        tax_year=tax_year,
+        valid_from=date(tax_year, 1, 1) if tax_year is not None else None,
         sections=[Section(paragraphs=[Paragraph(text=text)])],
         plain_text=text,
     )
@@ -39,11 +41,14 @@ def test_fixed_token_chunker_applies_overlap_and_neighbor_links() -> None:
 
 
 def test_fixed_token_chunker_is_deterministic_and_preserves_source_metadata() -> None:
-    source = document("one two three four")
+    source = document("one two three four", tax_year=2025)
     chunker = FixedTokenChunker(max_tokens=2, overlap_tokens=0)
 
     assert chunker.chunk(source) == chunker.chunk(source)
     assert chunker.chunk(source)[0].metadata.source_url == source.source_url
+    assert chunker.chunk(source)[0].metadata.tax_year == 2025
+    assert chunker.chunk(source)[0].metadata.valid_from == date(2025, 1, 1)
+    assert chunker.chunk(source)[0].metadata.version_id == source.version_id
     assert chunker.chunk(source)[0].section_path == ()
 
 

@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 from taxguide.domain.exceptions import DocumentLoadError
 from taxguide.domain.models import RawDocument
-from taxguide.ingestion.hashing import document_id_from_url
+from taxguide.ingestion.hashing import document_id_from_url, version_id_from_document
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +26,18 @@ class LocalHtmlSource:
         try:
             data = path.read_bytes()
             parts = urlsplit(source_url)
+            document_id = document_id_from_url(source_url)
+            content_hash = sha256(data).hexdigest()
             document = RawDocument(
-                id=document_id_from_url(source_url),
+                id=document_id,
+                version_id=version_id_from_document(document_id, content_hash),
                 source_url=source_url,
                 source_domain=parts.hostname or "",
                 source_path=parts.path,
                 local_path=path.resolve(),
                 content=data.decode("utf-8-sig"),
                 retrieved_at=self.clock(),
-                content_hash=sha256(data).hexdigest(),
+                content_hash=content_hash,
             )
         except (OSError, ValueError) as exc:
             raise DocumentLoadError(f"Cannot load HTML {path}: {exc}") from exc

@@ -71,6 +71,7 @@ def test_changed_capture_preserves_document_id_and_changes_content_hash(tmp_path
 
     assert first.id == second.id
     assert first.content_hash != second.content_hash
+    assert first.version_id != second.version_id
 
 
 @pytest.mark.parametrize(

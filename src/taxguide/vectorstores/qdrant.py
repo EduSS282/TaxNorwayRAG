@@ -125,18 +125,24 @@ def _chunk_payload(chunk: Chunk) -> dict[str, Any]:
 
 def _qdrant_filter(filters: RetrievalFilter | None) -> Any | None:
     """Translate the supported retrieval metadata constraint to Qdrant's payload filter."""
-    if filters is None or filters.tax_year is None:
+    if filters is None:
         return None
     from qdrant_client.models import FieldCondition, Filter, MatchValue
 
-    return Filter(
-        must=[
-            FieldCondition(
-                key="metadata.tax_year",
-                match=MatchValue(value=filters.tax_year),
-            )
-        ]
-    )
+    values = {
+        "metadata.tax_year": filters.tax_year,
+        "metadata.topic": filters.topic.value if filters.topic is not None else None,
+        "metadata.language": filters.language,
+        "metadata.source_domain": filters.source,
+        "metadata.document_type": filters.document_type,
+        "metadata.audience": filters.audience,
+    }
+    conditions: list[Any] = [
+        FieldCondition(key=key, match=MatchValue(value=value))
+        for key, value in values.items()
+        if value is not None
+    ]
+    return Filter(must=conditions) if conditions else None
 
 
 def _chunk_from_payload(payload: Any) -> dict[str, Any]:

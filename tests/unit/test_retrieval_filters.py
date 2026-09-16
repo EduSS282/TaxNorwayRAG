@@ -1,20 +1,48 @@
 from datetime import UTC, datetime
 
+import pytest
+from pydantic import ValidationError
+
+from taxguide.domain.enums import TaxTopic
 from taxguide.domain.models import Chunk, ChunkMetadata
 from taxguide.retrieval.filters import RetrievalFilter, filter_results
 from taxguide.vectorstores.base import ScoredChunk
 
 
 def test_metadata_filters_require_every_specified_value() -> None:
-    matching = _result("a", language="no", tax_year=2025, audience="individual")
-    ignored = _result("b", language="en", tax_year=2025, audience="individual")
+    matching = _result(
+        "a",
+        language="no",
+        tax_year=2025,
+        topic=TaxTopic.FOREIGN_ASSETS,
+        audience="individual",
+    )
+    ignored = _result(
+        "b",
+        language="en",
+        tax_year=2025,
+        topic=TaxTopic.BANK,
+        audience="individual",
+    )
 
     results = filter_results(
         [matching, ignored],
-        RetrievalFilter(language="no", tax_year=2025, audience="individual"),
+        RetrievalFilter(
+            language="no",
+            tax_year=2025,
+            topic=TaxTopic.FOREIGN_ASSETS,
+            audience="individual",
+        ),
     )
 
     assert results == [matching]
+
+
+def test_chunk_metadata_and_filter_reject_uncontrolled_topics() -> None:
+    with pytest.raises(ValidationError, match="topic"):
+        RetrievalFilter.model_validate({"topic": "miscellaneous"})
+    with pytest.raises(ValidationError, match="topic"):
+        _result("a", topic="miscellaneous")
 
 
 def _result(identity: str, **metadata_values: object) -> ScoredChunk:

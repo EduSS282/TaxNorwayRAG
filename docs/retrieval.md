@@ -23,6 +23,19 @@ least `limit`.
 in-memory sparse index applies it before lexical ranking. Chunks without a tax year are therefore
 not included in a year-filtered result set.
 
+If the query itself mentions one year, the CLI resolves it automatically and applies the same
+pre-ranking filter. An explicit `--tax-year` that conflicts with the query is rejected, as is a
+query containing multiple distinct years. Higher application layers can provide conversation,
+identified-form, and current-applicable-year hints through `TaxYearResolutionContext`; precedence
+is explicit query, conversation, form, then current year. A required but unresolved year asks for
+clarification instead of silently selecting one.
+
+`TaxYearAwareRetriever` also validates returned payloads. A vector-store or retriever adapter that
+ignores the filter and returns a different or unknown year raises `CrossYearRetrievalError`, so
+wrong-year evidence cannot reach reranking or generation. Qdrant translates every declared
+metadata filter (`tax_year`, `language`, `source`, `document_type`, `audience`, and `topic`) into
+`must` conditions before dense search.
+
 The reranker is only constructed in `reranked` mode. Set `retrieval.reranker_provider` to `local`
 for the local `sentence-transformers` `CrossEncoder`, or `http` for a remote service. Both preserve
 the raw model score, including negative logits; scores are rankings rather than probabilities. The

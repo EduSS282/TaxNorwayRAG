@@ -56,3 +56,11 @@ class EmbeddingError(TaxguideError):
 
 class VectorStoreError(TaxguideError):
     """A vector-store request was rejected or could not be completed."""
+
+
+class TemporalResolutionError(TaxguideError):
+    """A query's applicable tax year is absent, ambiguous, or contradictory."""
+
+
+class CrossYearRetrievalError(TaxguideError):
+    """A retriever returned evidence outside the requested temporal scope."""

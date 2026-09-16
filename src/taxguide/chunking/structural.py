@@ -30,7 +30,6 @@ class StructuralChunker:
             texts=texts,
             section_paths=paths,
             tokenizer=self.tokenizer,
-            strategy_name=self.strategy_name,
         )
 
     def _path_for(

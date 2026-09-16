@@ -4,12 +4,14 @@ from collections.abc import Iterable
 
 from pydantic import Field
 
+from taxguide.domain.enums import TaxTopic
 from taxguide.domain.models import DomainModel
 from taxguide.vectorstores.base import ScoredChunk
 
 
 class RetrievalFilter(DomainModel):
     tax_year: int | None = Field(default=None, ge=1900, le=2100)
+    topic: TaxTopic | None = None
     language: str | None = None
     source: str | None = None
     document_type: str | None = None
@@ -25,6 +27,7 @@ def _matches(result: ScoredChunk, filters: RetrievalFilter) -> bool:
     metadata = result.chunk.metadata
     return (
         (filters.tax_year is None or metadata.tax_year == filters.tax_year)
+        and (filters.topic is None or metadata.topic == filters.topic)
         and (filters.language is None or metadata.language == filters.language)
         and (filters.source is None or metadata.source_domain == filters.source)
         and (filters.document_type is None or metadata.document_type == filters.document_type)

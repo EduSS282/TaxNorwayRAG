@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 
+from taxguide.domain.enums import TaxTopic
 from taxguide.domain.exceptions import VectorStoreError
 from taxguide.domain.models import Chunk, ChunkMetadata
 from taxguide.retrieval.filters import RetrievalFilter
@@ -51,6 +52,7 @@ def test_qdrant_store_indexes_chunk_payloads_and_restores_search_results() -> No
     assert client.points[0]["id"] == qdrant_point_id(chunk.id)
     assert client.points[0]["payload"]["chunk_id"] == chunk.id
     assert client.points[0]["payload"]["text"] == chunk.text
+    assert client.points[0]["payload"]["metadata"]["topic"] == "deadlines"
     result = store.search((0.1, 0.2), limit=1)[0]
     assert result.chunk == chunk
     assert result.score == 0.9
@@ -79,6 +81,37 @@ def test_qdrant_store_translates_tax_year_to_a_payload_filter() -> None:
     assert condition.match.value == 2025
 
 
+def test_qdrant_store_translates_every_declared_metadata_filter() -> None:
+    class FilterClient(FakeQdrantClient):
+        def query_points(self, **kwargs: Any) -> "FakeQueryResponse":
+            self.query_filter = kwargs["query_filter"]
+            return FakeQueryResponse([])
+
+    client = FilterClient()
+    QdrantVectorStore(client).search(
+        (0.1, 0.2),
+        limit=1,
+        filters=RetrievalFilter(
+            tax_year=2025,
+            topic=TaxTopic.DEADLINES,
+            language="en",
+            source="www.skatteetaten.no",
+            document_type="guidance",
+            audience="individual",
+        ),
+    )
+
+    values = {condition.key: condition.match.value for condition in client.query_filter.must}
+    assert values == {
+        "metadata.tax_year": 2025,
+        "metadata.topic": "deadlines",
+        "metadata.language": "en",
+        "metadata.source_domain": "www.skatteetaten.no",
+        "metadata.document_type": "guidance",
+        "metadata.audience": "individual",
+    }
+
+
 def test_qdrant_store_loads_all_persisted_chunk_payloads() -> None:
     chunk = _chunk()
 
@@ -88,6 +121,20 @@ def test_qdrant_store_loads_all_persisted_chunk_payloads() -> None:
             return [point], None
 
     assert QdrantVectorStore(ScrollClient()).load_chunks() == [chunk]
+
+
+def test_qdrant_store_loads_payloads_from_before_document_versioning() -> None:
+    chunk = _chunk()
+    payload = {**chunk.model_dump(mode="json"), "chunk_id": chunk.id}
+    del payload["metadata"]["version_id"]
+
+    class ScrollClient(FakeQdrantClient):
+        def scroll(self, **_: Any) -> tuple[list[FakeScoredPoint], None]:
+            return [FakeScoredPoint(payload, 0)], None
+
+    restored = QdrantVectorStore(ScrollClient()).load_chunks()[0]
+
+    assert restored.metadata.version_id is None
 
 
 def test_qdrant_point_ids_are_stable_distinct_and_valid_uuids() -> None:
@@ -135,6 +182,7 @@ def _chunk() -> Chunk:
         metadata=ChunkMetadata(
             source_url="https://www.skatteetaten.no/en/example",
             source_domain="www.skatteetaten.no",
+            topic=TaxTopic.DEADLINES,
             retrieved_at=datetime(2026, 9, 9, tzinfo=UTC),
             document_content_hash="d" * 64,
         ),

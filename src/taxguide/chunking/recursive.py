@@ -26,7 +26,6 @@ class RecursiveChunker:
             texts=groups,
             section_paths=[()] * len(groups),
             tokenizer=self.tokenizer,
-            strategy_name=self.strategy_name,
         )
 
     def _split(self, text: str, level: int) -> list[str]:

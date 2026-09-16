@@ -2,7 +2,12 @@ from hashlib import sha256
 
 import pytest
 
-from taxguide.ingestion.hashing import canonical_source_url, document_id_from_url, hash_text
+from taxguide.ingestion.hashing import (
+    canonical_source_url,
+    document_id_from_url,
+    hash_text,
+    version_id_from_document,
+)
 
 
 def test_hash_text_is_deterministic():
@@ -79,3 +84,12 @@ def test_hash_text_uses_utf8_without_changing_content():
     assert hash_text(text) == sha256(text.encode("utf-8")).hexdigest()
     assert hash_text(text) == hash_text(text)
     assert hash_text(text) != hash_text(text.rstrip())
+
+
+def test_document_version_id_is_stable_and_changes_with_content() -> None:
+    document_id = "a" * 64
+
+    first = version_id_from_document(document_id, "b" * 64)
+
+    assert first == version_id_from_document(document_id, "b" * 64)
+    assert first != version_id_from_document(document_id, "c" * 64)

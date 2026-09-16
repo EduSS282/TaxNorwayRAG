@@ -203,6 +203,51 @@ def test_retrieve_cli_without_tax_year_does_not_pass_a_filter(
     assert calls == [{"limit": 5}]
 
 
+def test_retrieve_cli_extracts_an_explicit_year_from_the_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: list[RetrievalFilter | None] = []
+
+    class EmptyRetriever:
+        def retrieve(
+            self, query: str, *, limit: int, filters: RetrievalFilter | None = None
+        ) -> list[object]:
+            received.append(filters)
+            return []
+
+    monkeypatch.setattr(
+        retrieve_module, "build_retriever", lambda *_args, **_kwargs: EmptyRetriever()
+    )
+
+    result = CliRunner().invoke(app, ["retrieve", "deduction for tax year 2025"])
+
+    assert result.exit_code == 0, result.output
+    assert received == [RetrievalFilter(tax_year=2025)]
+
+
+def test_retrieve_cli_reports_conflicting_years_without_a_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    class EmptyRetriever:
+        def retrieve(self, query: str, **kwargs: object) -> list[object]:
+            nonlocal called
+            called = True
+            return []
+
+    monkeypatch.setattr(
+        retrieve_module, "build_retriever", lambda *_args, **_kwargs: EmptyRetriever()
+    )
+
+    result = CliRunner().invoke(app, ["retrieve", "deduction for 2025", "--tax-year", "2024"])
+
+    assert result.exit_code == 1
+    assert "conflicts" in result.output
+    assert "Traceback" not in result.output
+    assert not called
+
+
 def test_reranked_cli_rejects_candidate_limit_smaller_than_limit() -> None:
     result = CliRunner().invoke(
         app,

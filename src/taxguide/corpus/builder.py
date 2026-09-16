@@ -14,6 +14,7 @@ from taxguide.corpus.models import (
 from taxguide.corpus.selector import effective_url, source_version_url, tax_year_from_url
 from taxguide.domain.exceptions import CorpusError, TaxguideError
 from taxguide.embeddings.base import Embedder
+from taxguide.ingestion.hashing import version_id_from_document
 from taxguide.ingestion.pipeline import IngestionPipeline
 from taxguide.vectorstores.base import VectorStore
 
@@ -84,6 +85,9 @@ class CorpusBuilder:
                 document = document.model_copy(
                     update={
                         "id": manifest.document_id,
+                        "version_id": version_id_from_document(
+                            manifest.document_id, document.content_hash
+                        ),
                         "tax_year": tax_year_from_url(url),
                     }
                 )

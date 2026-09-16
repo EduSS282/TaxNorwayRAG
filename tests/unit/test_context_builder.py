@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -42,6 +42,8 @@ def test_context_render_includes_traceability_metadata() -> None:
     assert "section=Income > Foreign income" in rendered
     assert "source_url=https://www.skatteetaten.no/en/example" in rendered
     assert "tax_year=2026" in rendered
+    assert "valid_from=2026-01-01" in rendered
+    assert "valid_to=2026-12-31" in rendered
     assert "text:\nTax evidence" in rendered
 
 
@@ -84,6 +86,8 @@ def _chunk(
             source_url="https://www.skatteetaten.no/en/example",
             source_domain="www.skatteetaten.no",
             tax_year=2026,
+            valid_from=date(2026, 1, 1),
+            valid_to=date(2026, 12, 31),
             retrieved_at=datetime(2026, 1, 1, tzinfo=UTC),
             document_content_hash="e" * 64,
         ),
