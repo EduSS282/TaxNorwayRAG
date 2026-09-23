@@ -1,7 +1,9 @@
 # Deterministic tax routing
 
-The online pipeline classifies a query before retrieval. The implementation is deliberately
-rule-based: every output is reproducible and can be inspected without loading a language model.
+The routing module classifies a query before retrieval in the target grounded service. The
+implementation is deliberately rule-based: every output is reproducible and can be inspected
+without loading a language model. It is not currently composed by `taxguide retrieve`, which uses
+tax-year resolution and filtering directly, and there is no end-to-end `answer` command yet.
 
 `ControlledTaxonomy` defines the closed topic vocabulary from architecture section 19 and matches
 English, Norwegian, and Spanish aliases. Stored metadata and downstream filters should use

@@ -11,10 +11,6 @@ Run it on the remote machine from the repository checkout:
 ```bash
 uv sync
 uv run uvicorn taxguide.reranking.service:app --host 127.0.0.1 --port 8001
-
-uv run uvicorn reranker_service:app \
-  --host 127.0.0.1 \
-  --port 8001
 ```
 
 Bind to `127.0.0.1` when accessing the service through an SSH tunnel. The service returns raw
@@ -44,7 +40,7 @@ reranking-capable GGUF model. Configure the local end of the separately managed 
 retrieval:
   reranker_provider: llamacpp
   reranker_base_url: http://localhost:8001
-  reranker_timeout: 300
+  reranker_timeout: 30
   candidate_limit: 10
 ```
 
@@ -59,3 +55,15 @@ TaxGuide laptop → localhost:8001 → SSH tunnel → remote llama-server → re
 `llama-server` must already be running with reranking enabled. TaxGuide does not start it,
 download models, create SSH tunnels, manage its process, or manage remote infrastructure. This
 provider does not load `sentence-transformers` or local model weights.
+
+For the configured 0.6B model, a CPU-first development command is:
+
+```powershell
+llama-server `
+  -hf ggml-org/Qwen3-reranker-0.6B-Q8_0-GGUF:Q8_0 `
+  --embedding --rerank --pooling rank `
+  --host 127.0.0.1 --port 8001 -ngl 0
+```
+
+Dense, sparse, and hybrid modes do not require this service. There is no automatic fallback when
+reranked mode cannot reach it.

@@ -7,6 +7,15 @@
 
 ---
 
+> **Estado del documento:** esta es la arquitectura objetivo y el catálogo de decisiones y
+> experimentos, no una descripción de todo lo ya implementado. El estado verificable del código se
+> mantiene en [`docs/architecture.md`](../docs/architecture.md); la frontera actual de generación
+> está en [`docs/generation.md`](../docs/generation.md), y la operación recomendada para el hardware
+> disponible está en [`docs/local-runtime.md`](../docs/local-runtime.md). Cuando exista una
+> diferencia, esos documentos y los contratos del código describen el comportamiento actual.
+
+---
+
 ## 0. Resumen ejecutivo
 
 El sistema propuesto, denominado provisionalmente **TaxGuide Norway**, será un asistente RAG especializado en documentación fiscal noruega. Su objetivo no es calcular impuestos de forma autónoma ni sustituir a Skatteetaten, sino:
@@ -4833,4 +4842,3 @@ y cuándo decidió no responder.
 ```
 
 Si se mantiene esta disciplina durante el desarrollo, TaxGuide Norway puede convertirse en un proyecto de RAG considerablemente más sólido que la mayoría de demos basadas únicamente en vector search + LLM.
-

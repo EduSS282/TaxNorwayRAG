@@ -44,8 +44,11 @@ remote-service setup.
 
 ## Live retrieval benchmark
 
-The versioned gold set at `data/evaluation/retrieval_gold_v1.json` matches results by normalized
-source URL (scheme/host case, query, fragment, and a trailing slash are ignored). It compares dense,
+The live harness expects a local gold set at `data/evaluation/retrieval_gold_v1.json` and matches
+results by normalized source URL (scheme/host case, query, fragment, and a trailing slash are
+ignored). The `data/` directory is ignored by Git, so a fresh checkout does not contain this real
+evaluation corpus and the repository does not yet publish a reproducible baseline. The harness
+compares dense,
 sparse, hybrid, and reranked retrieval with Recall@1/5/10, MRR, graded nDCG@5/10, and latency.
 Repeated chunks from one source URL count as a single document at their first retrieved position;
 all metric cutoffs apply after this stable URL deduplication. Latency includes cold initialization,
@@ -63,3 +66,8 @@ TAXGUIDE_RUN_RETRIEVAL_EVAL=1 uv run pytest -m retrieval_eval -s
 ```
 
 The benchmark never starts services, downloads models, or creates SSH tunnels.
+
+Results are exploratory until the gold set, corpus manifest, model revisions/quantizations,
+hardware/runtime manifest, thresholds, and generated report are versioned together. The small
+checked-in fixtures under `tests/fixtures/evaluation/` test metric contracts; they are not evidence
+of real retrieval or generation quality.

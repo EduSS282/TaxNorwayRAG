@@ -57,5 +57,7 @@ another HTML structure; inject them into `IngestionPipeline` with a compatible
 normalizer. Add saved fixtures and tests before extending the selectors.
 
 The current fixtures are synthetic and cover basic structure, nested headings,
-lists, tables, and noise. Before using a real corpus, manually review representative
-official captures. Automatic downloading is not implemented in this phase.
+lists, tables, and noise. Before trusting a real corpus, manually review representative
+official captures. Bounded downloading is implemented by `taxguide crawl`; it produces raw HTML
+and crawl manifests for the corpus workflow. The local ingestion pipeline itself remains
+network-free and does not fetch a URL passed to `parse` or `inspect`.
