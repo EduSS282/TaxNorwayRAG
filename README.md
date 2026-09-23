@@ -171,6 +171,7 @@ contract and its remaining limitations.
 
 - [Architecture](docs/architecture.md)
 - [Local runtime and hardware](docs/local-runtime.md)
+- [Desktop, laptop, and Oracle deployment](docs/three-machine-deployment.md)
 - [Grounded generation status](docs/generation.md)
 - [Crawler](docs/crawler.md)
 - [Corpus workflow](docs/corpus.md)

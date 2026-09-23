@@ -3,6 +3,10 @@
 This guide describes the recommended development deployment for the available hardware and the
 services required by `taxguide answer`.
 
+For the complete three-machine runbook, including the laptop reranker, Oracle scheduled crawling,
+SSH tunnels, configuration overlays, and startup order, see
+[three-machine deployment](three-machine-deployment.md).
+
 ## Recommended allocation
 
 | Machine | Primary responsibilities | Avoid as a required dependency |
