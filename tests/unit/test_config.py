@@ -50,7 +50,12 @@ def test_base_config_loads_without_overlay():
     assert config.retrieval.reranker_provider == "llamacpp"
     assert config.retrieval.reranker_base_url == "http://localhost:8001"
     assert config.generation.model_profile == "portable"
+    assert config.generation.provider == "openai_compatible"
+    assert config.generation.base_url == "http://127.0.0.1:8080"
     assert config.generation.model == "Qwen/Qwen3-4B-Instruct-2507"
+    assert config.generation.timeout == 180.0
+    assert config.generation.evidence_max_tokens == 2400
+    assert config.generation.max_chunks_per_document == 2
     assert config.generation.temperature == 0.1
     assert config.generation.max_tokens == 1000
     assert config.generation.structured_output is True
@@ -78,7 +83,12 @@ def test_invalid_reranker_provider_fails_validation(tmp_path):
     "content, message",
     [
         ("generation: {model_profile: remote}", "model_profile"),
+        ("generation: {provider: unknown}", "provider"),
+        ("generation: {base_url: ''}", "base_url"),
         ("generation: {model: ''}", "model"),
+        ("generation: {timeout: 0}", "timeout"),
+        ("generation: {evidence_max_tokens: 0}", "evidence_max_tokens"),
+        ("generation: {max_chunks_per_document: 0}", "max_chunks_per_document"),
         ("generation: {temperature: 2.1}", "temperature"),
         ("generation: {max_tokens: 0}", "max_tokens"),
     ],

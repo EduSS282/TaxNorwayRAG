@@ -45,7 +45,12 @@ retrieval:
   reranker_timeout: 30.0
 generation:
   model_profile: portable
+  provider: openai_compatible
+  base_url: http://127.0.0.1:8080
   model: Qwen/Qwen3-4B-Instruct-2507
+  timeout: 180.0
+  evidence_max_tokens: 2400
+  max_chunks_per_document: 2
   temperature: 0.1
   max_tokens: 1000
   structured_output: true

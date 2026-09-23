@@ -1,8 +1,7 @@
 # Local runtime and hardware profile
 
-This guide describes the recommended development deployment for the available hardware. It does
-not change the current feature boundary: TaxGuide can retrieve ranked evidence, but it cannot yet
-produce an end-to-end grounded answer.
+This guide describes the recommended development deployment for the available hardware and the
+services required by `taxguide answer`.
 
 ## Recommended allocation
 
@@ -27,7 +26,7 @@ The default configuration expects:
 | Qdrant | `http://127.0.0.1:6333` | Chunk payload and dense-vector storage |
 | Ollama | `http://127.0.0.1:11434` | `qwen3-embedding:0.6b` embeddings |
 | llama.cpp reranker | `http://127.0.0.1:8001` | `/v1/rerank` |
-| llama.cpp generator | `http://127.0.0.1:8080` | Future `/v1/chat/completions` integration |
+| llama.cpp generator | `http://127.0.0.1:8080` | `/v1/chat/completions` grounded generation |
 
 Model services are operator-managed. TaxGuide does not start, stop, update, or supervise them.
 
@@ -56,20 +55,10 @@ docker compose up -d qdrant
 Invoke-RestMethod -Uri "http://127.0.0.1:6333/healthz"
 ```
 
-The application does not create its collection. For the configured Qwen 0.6B embedding model,
-create the current 1024-dimensional cosine collection once:
-
-```powershell
-$collectionBody = '{"vectors":{"size":1024,"distance":"Cosine"}}'
-Invoke-RestMethod `
-  -Method Put `
-  -Uri "http://127.0.0.1:6333/collections/taxguide_chunks_temporal_v1" `
-  -ContentType "application/json" `
-  -Body $collectionBody
-```
-
-Changing the embedding model or its output dimension requires a new collection. Do not insert
-vectors from different models into the same collection.
+The first `taxguide corpus build --index` probes the configured embedder dimension and creates the
+missing `taxguide_chunks_temporal_v1` cosine collection. Later builds validate dimension and
+distance before writing. Changing the embedding model or output dimension therefore requires a
+new collection name; TaxGuide rejects incompatible reuse.
 
 The provided Compose file publishes ports 6333 and 6334 on the host. Treat it as a development
 configuration. Do not run it unchanged on an Internet-facing VM.
@@ -112,13 +101,14 @@ If CPU reranking interferes with the desktop generator, the same process can run
 `retrieval.reranker_base_url` can point to its private LAN/VPN address. Restrict the laptop firewall
 to the desktop source address.
 
-## 5. Prepare the future generator
+## 5. Start the generator
 
 Use a pinned GGUF conversion of `Qwen/Qwen3-4B-Instruct-2507`, initially Q4_K_M and 4096 context:
 
 ```powershell
 llama-server `
   -m C:\models\qwen3-4b-instruct-2507-q4_k_m.gguf `
+  --alias Qwen/Qwen3-4B-Instruct-2507 `
   --host 127.0.0.1 --port 8080 `
   -c 4096 -ngl 99 --jinja
 ```
@@ -127,10 +117,11 @@ Record the exact model repository, revision/hash, quantization, llama.cpp versio
 hardware in every benchmark report. A third-party quantization should be pinned and verified rather
 than silently tracking a mutable model file.
 
-This server is preparation for the next milestone. The current TaxGuide configuration does not
-contain its base URL and no `answer` command calls it.
+The base URL, timeout, model identifier, output-token limit, and evidence budget are configured
+under `generation` in `configs/base.yaml`. The model identifier sent to the server must match an
+identifier accepted by that server.
 
-## 6. Crawl, index, and retrieve
+## 6. Crawl, index, retrieve, and answer
 
 ```powershell
 uv run taxguide crawl `
@@ -148,6 +139,10 @@ uv run taxguide corpus build `
 uv run taxguide retrieve `
   "What is the minimum standard deduction for 2025?" `
   --mode hybrid --limit 5
+
+uv run taxguide answer `
+  "What is the minimum standard deduction for 2025?" `
+  --mode hybrid
 ```
 
 Use `--mode reranked` only while the reranker is healthy. There is no automatic fallback when an

@@ -17,7 +17,7 @@ processes.
 
 ## Decision
 
-- Keep Qdrant, TaxGuide, embeddings, and future generation on the desktop for the initial working
+- Keep Qdrant, TaxGuide, embeddings, and generation on the desktop for the initial working
   system.
 - Run the reranker on CPU first; the laptop is an optional private-network host, not a required
   dependency.

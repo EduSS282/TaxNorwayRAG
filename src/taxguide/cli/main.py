@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 
+from taxguide.cli.answer import answer
 from taxguide.cli.chunk import chunk
 from taxguide.cli.corpus import app as corpus_app
 from taxguide.cli.crawl import crawl
@@ -17,6 +18,7 @@ from taxguide.ingestion.skatteetaten_parser import SkatteetatenHtmlParser
 from taxguide.sources.local import LocalHtmlSource
 
 app = typer.Typer(no_args_is_help=True)
+app.command(name="answer")(answer)
 app.command(name="chunk")(chunk)
 app.command(name="crawl")(crawl)
 app.command(name="retrieve")(retrieve)

@@ -20,6 +20,7 @@ class OpenAICompatibleGenerator:
         model_id: str,
         *,
         timeout: float = 120.0,
+        structured_output: bool = False,
         client: httpx.Client | None = None,
     ) -> None:
         if not base_url.strip():
@@ -30,6 +31,7 @@ class OpenAICompatibleGenerator:
             raise ValueError("generation timeout must be positive")
         self._base_url = base_url.rstrip("/")
         self._model_id = model_id
+        self._structured_output = structured_output
         self._client = client or httpx.Client(timeout=timeout)
 
     @property
@@ -50,14 +52,17 @@ class OpenAICompatibleGenerator:
         if max_tokens <= 0:
             raise ValueError("generation max_tokens must be positive")
         try:
+            payload: dict[str, Any] = {
+                "model": self._model_id,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            if self._structured_output:
+                payload["response_format"] = {"type": "json_object"}
             response = self._client.post(
                 f"{self._base_url}/v1/chat/completions",
-                json={
-                    "model": self._model_id,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                },
+                json=payload,
             )
             response.raise_for_status()
         except httpx.HTTPError as error:

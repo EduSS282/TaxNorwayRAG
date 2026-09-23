@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "taxguide-norway"
 version = "0.1.0"
-description = "Typed local ingestion of Norwegian tax documentation"
+description = "Grounded retrieval and generation over Norwegian tax documentation"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -32,7 +32,10 @@ packages = ["src/taxguide"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=taxguide --cov-report=term-missing"
-markers = ["retrieval_eval: live retrieval benchmark; requires TAXGUIDE_RUN_RETRIEVAL_EVAL=1"]
+markers = [
+    "retrieval_eval: live retrieval benchmark; requires TAXGUIDE_RUN_RETRIEVAL_EVAL=1",
+    "generation_eval: live grounded-generation smoke test; requires TAXGUIDE_RUN_GENERATION_EVAL=1",
+]
 
 [tool.ruff]
 target-version = "py312"

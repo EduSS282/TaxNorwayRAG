@@ -29,11 +29,11 @@ uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --li
 uv run taxguide corpus build --url-prefix "/en/person/taxes/" --exclude-wizards --index
 ```
 
-Indexing requires the configured embedding service and an existing Qdrant collection with the
-matching vector dimension. The command does not create or validate the collection; see
-[local Qdrant](qdrant-local.md). The configured embedder is called directly: the available
-`CachingBatchingEmbedder` is not currently composed into this workflow, so repeated builds do not
-use a persistent embedding cache.
+Indexing requires the configured embedding service and Qdrant. The command creates a missing
+single-vector cosine collection using the embedder's reported dimension and validates an existing
+collection before upsert; see [local Qdrant](qdrant-local.md). The configured embedder is called
+directly: the available `CachingBatchingEmbedder` is not currently composed into this workflow, so
+repeated builds do not use a persistent embedding cache.
 
 `--list` shows document ID, language, page type, and effective URL. `--json`
 provides the same selection data without HTML. Effective URL priority is an

@@ -11,6 +11,12 @@ from taxguide.vectorstores.base import ScoredChunk
 
 
 class QdrantClient(Protocol):
+    def collection_exists(self, collection_name: str) -> bool: ...
+
+    def create_collection(self, *, collection_name: str, vectors_config: Any) -> bool: ...
+
+    def get_collection(self, collection_name: str) -> Any: ...
+
     def upsert(self, *, collection_name: str, points: list[dict[str, Any]]) -> None: ...
 
     def query_points(
@@ -50,6 +56,51 @@ class QdrantVectorStore:
     def __init__(self, client: QdrantClient, *, collection_name: str = "taxguide_chunks") -> None:
         self._client = client
         self._collection_name = collection_name
+
+    def ensure_collection(self, vector_size: int) -> None:
+        """Create a missing cosine collection and reject an incompatible existing schema."""
+        if vector_size <= 0:
+            raise ValueError("vector_size must be positive")
+        try:
+            exists = self._client.collection_exists(self._collection_name)
+            if not exists:
+                from qdrant_client.models import Distance, VectorParams
+
+                self._client.create_collection(
+                    collection_name=self._collection_name,
+                    vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+                )
+            self.validate_collection(vector_size)
+        except VectorStoreError:
+            raise
+        except Exception as exc:
+            raise _qdrant_error(exc) from exc
+
+    def validate_collection(self, vector_size: int) -> None:
+        """Require the configured collection to use one cosine vector of the expected size."""
+        if vector_size <= 0:
+            raise ValueError("vector_size must be positive")
+        try:
+            if not self._client.collection_exists(self._collection_name):
+                raise VectorStoreError(
+                    f"Qdrant collection {self._collection_name!r} does not exist"
+                )
+            info = self._client.get_collection(self._collection_name)
+            actual_size, actual_distance = _collection_vector_config(info)
+        except VectorStoreError:
+            raise
+        except Exception as exc:
+            raise _qdrant_error(exc) from exc
+        if actual_size != vector_size:
+            raise VectorStoreError(
+                f"Qdrant collection {self._collection_name!r} has vector size {actual_size}; "
+                f"expected {vector_size}"
+            )
+        if actual_distance.casefold() != "cosine":
+            raise VectorStoreError(
+                f"Qdrant collection {self._collection_name!r} uses distance "
+                f"{actual_distance!r}; expected 'Cosine'"
+            )
 
     def upsert(self, chunks: list[Chunk], embeddings: EmbeddingBatch) -> None:
         if len(chunks) != len(embeddings):
@@ -149,6 +200,21 @@ def _chunk_from_payload(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise VectorStoreError("Qdrant returned a point without a payload object")
     return {key: value for key, value in payload.items() if key != "chunk_id"}
+
+
+def _collection_vector_config(info: Any) -> tuple[int, str]:
+    try:
+        vectors = info.config.params.vectors
+    except AttributeError as exc:
+        raise VectorStoreError("Qdrant returned an unreadable collection configuration") from exc
+    if isinstance(vectors, dict):
+        raise VectorStoreError("named-vector Qdrant collections are not supported")
+    size = getattr(vectors, "size", None)
+    distance = getattr(vectors, "distance", None)
+    if isinstance(size, bool) or not isinstance(size, int) or size <= 0 or distance is None:
+        raise VectorStoreError("Qdrant returned an invalid vector configuration")
+    rendered_distance = getattr(distance, "value", distance)
+    return size, str(rendered_distance)
 
 
 def _qdrant_error(error: Exception) -> VectorStoreError:

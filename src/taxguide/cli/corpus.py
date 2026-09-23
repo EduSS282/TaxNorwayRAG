@@ -60,6 +60,7 @@ def _indexing(settings: AppConfig) -> tuple[Embedder, VectorStore]:
         cast(QdrantClientProtocol, QdrantClient(url=settings.corpus.qdrant_url)),
         collection_name=settings.corpus.qdrant_collection,
     )
+    store.ensure_collection(embedder.dimension)
     return embedder, cast(VectorStore, store)
 
 

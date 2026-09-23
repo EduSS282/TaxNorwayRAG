@@ -37,6 +37,25 @@ def test_openai_compatible_generator_sends_openai_chat_payload() -> None:
     }
 
 
+def test_openai_compatible_generator_requests_json_object_output_when_configured() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]})
+
+    generator = OpenAICompatibleGenerator(
+        "http://localhost:8000",
+        "test-model",
+        structured_output=True,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    generator.generate(_messages(), temperature=0.1, max_tokens=10)
+
+    assert json.loads(requests[0].content)["response_format"] == {"type": "json_object"}
+
+
 @pytest.mark.parametrize(
     "response",
     [

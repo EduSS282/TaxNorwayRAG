@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -15,6 +16,30 @@ class FakeQdrantClient:
     def __init__(self) -> None:
         self.points: list[dict[str, Any]] = []
         self.upsert_calls: list[list[dict[str, Any]]] = []
+        self.collection_present = True
+        self.vector_size = 2
+        self.distance = "Cosine"
+        self.created_vectors_config: Any | None = None
+
+    def collection_exists(self, collection_name: str) -> bool:
+        assert collection_name == "taxguide_chunks"
+        return self.collection_present
+
+    def create_collection(self, *, collection_name: str, vectors_config: Any) -> bool:
+        assert collection_name == "taxguide_chunks"
+        self.collection_present = True
+        self.vector_size = vectors_config.size
+        self.distance = vectors_config.distance.value
+        self.created_vectors_config = vectors_config
+        return True
+
+    def get_collection(self, collection_name: str) -> object:
+        assert collection_name == "taxguide_chunks"
+        vectors = SimpleNamespace(
+            size=self.vector_size,
+            distance=SimpleNamespace(value=self.distance),
+        )
+        return SimpleNamespace(config=SimpleNamespace(params=SimpleNamespace(vectors=vectors)))
 
     def upsert(self, *, collection_name: str, points: list[dict[str, Any]]) -> None:
         assert collection_name == "taxguide_chunks"
@@ -65,6 +90,53 @@ def test_qdrant_store_rejects_invalid_upsert_and_search_arguments() -> None:
         store.upsert([_chunk()], [])
     with pytest.raises(ValueError, match="positive"):
         store.search((0.1, 0.2), limit=0)
+
+
+def test_qdrant_store_creates_a_missing_cosine_collection() -> None:
+    client = FakeQdrantClient()
+    client.collection_present = False
+
+    QdrantVectorStore(client).ensure_collection(1024)
+
+    assert client.created_vectors_config is not None
+    assert client.vector_size == 1024
+    assert client.distance == "Cosine"
+
+
+@pytest.mark.parametrize(
+    ("vector_size", "distance", "message"),
+    [(3, "Cosine", "vector size 3"), (2, "Dot", "expected 'Cosine'")],
+)
+def test_qdrant_store_rejects_an_incompatible_collection(
+    vector_size: int, distance: str, message: str
+) -> None:
+    client = FakeQdrantClient()
+    client.vector_size = vector_size
+    client.distance = distance
+
+    with pytest.raises(VectorStoreError, match=message):
+        QdrantVectorStore(client).validate_collection(2)
+
+
+def test_qdrant_store_rejects_named_vector_collections() -> None:
+    class NamedVectorClient(FakeQdrantClient):
+        def get_collection(self, collection_name: str) -> object:
+            return SimpleNamespace(
+                config=SimpleNamespace(params=SimpleNamespace(vectors={"dense": object()}))
+            )
+
+    with pytest.raises(VectorStoreError, match="named-vector"):
+        QdrantVectorStore(NamedVectorClient()).validate_collection(2)
+
+
+@pytest.mark.parametrize("vector_size", [0, -1])
+def test_qdrant_store_rejects_invalid_collection_vector_size(vector_size: int) -> None:
+    store = QdrantVectorStore(FakeQdrantClient())
+
+    with pytest.raises(ValueError, match="vector_size"):
+        store.ensure_collection(vector_size)
+    with pytest.raises(ValueError, match="vector_size"):
+        store.validate_collection(vector_size)
 
 
 def test_qdrant_store_translates_tax_year_to_a_payload_filter() -> None:

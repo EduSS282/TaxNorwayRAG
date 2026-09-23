@@ -96,6 +96,13 @@ def test_corpus_indexing_uses_the_configured_embedder_factory(monkeypatch) -> No
         def __init__(self, *, url: str) -> None:
             self.url = url
 
+        def collection_exists(self, collection_name: str) -> bool:
+            return True
+
+        def get_collection(self, collection_name: str) -> object:
+            vectors = SimpleNamespace(size=2, distance=SimpleNamespace(value="Cosine"))
+            return SimpleNamespace(config=SimpleNamespace(params=SimpleNamespace(vectors=vectors)))
+
     settings = AppConfig(
         corpus=CorpusConfig(
             embedding_provider="ollama",

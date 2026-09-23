@@ -12,7 +12,7 @@ from taxguide.vectorstores.base import ScoredChunk
 def test_abstention_policy_abstains_without_sufficient_evidence() -> None:
     answer = _answer()
 
-    result = AbstentionPolicy().enforce(answer, GenerationContext())
+    result = AbstentionPolicy().enforce(answer, GenerationContext(), citations_valid=True)
 
     assert result.tax_year == 2026
     assert result.citations == []
@@ -31,11 +31,11 @@ def test_abstention_policy_abstains_when_citations_are_invalid() -> None:
 def test_abstention_policy_preserves_answer_with_sufficient_valid_evidence() -> None:
     answer = _answer()
 
-    assert AbstentionPolicy().enforce(answer, _context()) is answer
+    assert AbstentionPolicy().enforce(answer, _context(), citations_valid=True) is answer
 
 
 def test_abstention_policy_respects_configured_evidence_threshold() -> None:
-    assert AbstentionPolicy(minimum_evidence=2).should_abstain(_context())
+    assert AbstentionPolicy(minimum_evidence=2).should_abstain(_context(), citations_valid=True)
 
 
 @pytest.mark.parametrize("minimum_evidence", [0, -1])

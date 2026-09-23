@@ -6,22 +6,11 @@ Run `docker compose up -d qdrant`, then use the REST API at
 `http://localhost:6333` or the dashboard at `http://localhost:6333/dashboard`.
 The persistent local files live in `data/qdrant/`, which is ignored by Git.
 
-The Compose service starts Qdrant but does not create an application collection. TaxGuide also does
-not create or validate one. Before the first indexed corpus build, create a collection whose vector
-dimension matches the configured embedder. The default `qwen3-embedding:0.6b` configuration uses
-1024 dimensions and `taxguide_chunks_temporal_v1`:
-
-```powershell
-$collectionBody = '{"vectors":{"size":1024,"distance":"Cosine"}}'
-Invoke-RestMethod `
-  -Method Put `
-  -Uri "http://127.0.0.1:6333/collections/taxguide_chunks_temporal_v1" `
-  -ContentType "application/json" `
-  -Body $collectionBody
-```
-
-Use a new collection when the embedding model or dimension changes. Automatic collection
-lifecycle management remains part of the next orchestration milestone.
+The Compose service starts Qdrant without an application collection. On
+`taxguide corpus build --index`, TaxGuide reads the configured embedder dimension, creates a
+missing single-vector cosine collection, and validates an existing collection before upsert.
+Incompatible size, distance, or named-vector schemas fail without writing points. Use a new
+collection name when the embedding model or dimension changes.
 
 Run `docker compose down` to stop it. Add `-v` only when the local index can be
 discarded.

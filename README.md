@@ -5,9 +5,9 @@ official Norwegian tax documentation. The repository currently implements the of
 pipeline, four retrieval modes, tax-year-aware filtering, deterministic tax routing, and the
 contracts used by grounded generation.
 
-It does **not yet provide an end-to-end answer command or API**. The generation adapter, prompt,
-context builder, citation schema, validation, abstention policy, and evaluation primitives exist,
-but they are not composed into a service that turns a question into a validated answer.
+It now provides an end-to-end `taxguide answer` command that composes deterministic routing,
+tax-year resolution, retrieval, bounded context, local generation, validation, and safe abstention.
+An HTTP API and frontend are not implemented.
 
 ## Implemented today
 
@@ -19,8 +19,9 @@ but they are not composed into a service that turns a question into a validated 
 - in-memory BM25 sparse retrieval, reciprocal-rank fusion, and Qwen reranking;
 - strict pre-ranking tax-year filters and cross-year result validation;
 - deterministic topic, intent, risk, and route classification;
-- bounded generation context, structured answer/citation models, prompt construction, citation
-  validation, and safe abstention primitives;
+- automatic creation and schema validation of the Qdrant collection during indexed corpus builds;
+- bounded generation context, OpenAI-compatible local generation, Pydantic JSON parsing, citation,
+  quote-span and tax-year validation, explicit application statuses, and safe abstention;
 - unit/integration evaluation utilities and an opt-in live retrieval benchmark harness.
 
 See [current architecture](docs/architecture.md) for component boundaries and
@@ -47,17 +48,16 @@ downloaded by TaxGuide itself.
 
 ## Local workflow
 
-Start Qdrant and Ollama, ensure that the configured Qdrant collection exists, and pull the default
-embedding model:
+Start Qdrant and Ollama, then pull the default embedding model:
 
 ```bash
 docker compose up -d qdrant
 ollama pull qwen3-embedding:0.6b
 ```
 
-Collection creation is currently an explicit operational prerequisite; TaxGuide does not create or
-validate it automatically. Follow [local runtime](docs/local-runtime.md) for the PowerShell setup,
-model processes, hardware allocation, and security notes.
+The first indexed corpus build creates the configured cosine collection using the embedder's
+reported dimension. Existing collections are validated before any upsert. Follow
+[local runtime](docs/local-runtime.md) for model processes, hardware allocation, and security notes.
 
 Acquire and inspect official pages:
 
@@ -75,6 +75,16 @@ uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mo
 uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mode hybrid --limit 5
 uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mode reranked --candidate-limit 10 --limit 5
 ```
+
+With the generator running at the configured OpenAI-compatible endpoint:
+
+```bash
+uv run taxguide answer "What is the minimum standard deduction for 2025?" --mode hybrid
+uv run taxguide answer "Where do I report foreign income?" --tax-year 2025 --mode reranked --json
+```
+
+`answer` returns one of `answered`, `clarification_required`, `abstained`, or `failed`. It does not
+emit an unvalidated model answer.
 
 The CLI also supports direct local-file ingestion and chunk inspection:
 
@@ -99,7 +109,7 @@ URL → crawler → raw HTML + manifest → parser → normalizer → chunker
 Online retrieval
 question → tax-year resolution → metadata filter → dense/sparse/hybrid → optional reranker
 
-Implemented generation primitives, not yet orchestrated
+Grounded generation
 retrieved chunks → context builder → grounded prompt → generator → parse/validate → abstain/answer
 ```
 
@@ -129,19 +139,23 @@ uv run ruff format --check .
 uv run mypy src
 ```
 
-The live retrieval benchmark is opt-in and requires a populated Qdrant collection plus embedding
-and reranker services. See [retrieval](docs/retrieval.md). No reproducible real-corpus baseline is
-committed yet.
+The live retrieval benchmark and grounded-generation smoke test are opt-in and require a populated
+Qdrant collection plus the configured model services. See [retrieval](docs/retrieval.md) and
+[grounded generation](docs/generation.md). No reproducible real-corpus baseline is committed yet.
 
 ## Current limitations and next milestone
 
-- Qdrant collection creation, schema checks, service startup, and model downloads are external
-  operational steps.
+- Service startup and model downloads remain external operational steps.
 - `CachingBatchingEmbedder` provides process-local batching/cache behavior but is not composed by
   the configured embedding factory and is not persistent.
-- `taxguide answer` and a grounded RAG service do not exist yet.
-- Generated JSON is not yet parsed and validated in one orchestrated path; quote spans are not
-  checked against source text, and retrieved text has no dedicated prompt-injection sanitization.
+- Quote spans are checked for bounds and non-blank source text, but the schema does not carry a
+  copied quote for semantic equality checks.
+- Prompt instructions mark retrieved text as untrusted, but prompt isolation is not a complete
+  security boundary; deterministic validation remains mandatory.
+- Context selection budgets chunk tokens and does not yet count rendered metadata, JSON schema, or
+  chat-template overhead.
+- Claim-level faithfulness is evaluated only through offline injected evaluators, not enforced by
+  the online validator.
 - The checked-in generation fixture is intentionally small, and the live retrieval benchmark has
   no committed production-quality corpus, results, thresholds, or hardware manifest.
 - The crawler does not execute JavaScript, submit forms, enter authenticated areas, or traverse
@@ -149,9 +163,9 @@ committed yet.
 - TaxGuide provides information from official evidence; it is not a substitute for professional
   tax advice or an eligibility determination.
 
-The next coherent milestone is the [grounded generation orchestration](docs/generation.md):
-collection lifecycle checks, generator configuration/factory, a `GroundedRagService`, an `answer`
-entry point, fail-closed validation, end-to-end tests, and documentation in the same change set.
+The next coherent milestones are the persistent role-aware embedding cache and reproducible real
+retrieval/generation benchmarks. See [grounded generation](docs/generation.md) for the implemented
+contract and its remaining limitations.
 
 ## Documentation
 

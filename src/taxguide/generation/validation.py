@@ -17,6 +17,7 @@ class CitationValidator:
         context: GenerationContext,
         *,
         is_abstention: bool = False,
+        expected_tax_year: int | None = None,
     ) -> RagAnswer:
         """Return ``answer`` only when every citation is traceable to ``context``.
 
@@ -27,6 +28,11 @@ class CitationValidator:
         if not is_abstention and not answer.citations:
             raise CitationValidationError(
                 "non-abstained answers must include at least one citation"
+            )
+
+        if expected_tax_year is not None and answer.tax_year != expected_tax_year:
+            raise CitationValidationError(
+                "answer tax_year does not match the resolved request tax year"
             )
 
         evidence_by_id = _evidence_by_id(context)
@@ -51,6 +57,20 @@ class CitationValidator:
             if citation.source_title != evidence.chunk.metadata.title:
                 raise CitationValidationError(
                     f"citation {citation.citation_id} source_title does not match context evidence"
+                )
+            if citation.quote_span is not None:
+                start, end = citation.quote_span
+                if end > len(evidence.chunk.text):
+                    raise CitationValidationError(
+                        f"citation {citation.citation_id} quote_span is outside context evidence"
+                    )
+                if not evidence.chunk.text[start:end].strip():
+                    raise CitationValidationError(
+                        f"citation {citation.citation_id} quote_span selects no source text"
+                    )
+            if answer.tax_year is not None and evidence.chunk.metadata.tax_year != answer.tax_year:
+                raise CitationValidationError(
+                    f"citation {citation.citation_id} tax year does not match the answer"
                 )
         return answer
 

@@ -16,7 +16,7 @@ class AbstentionPolicy:
             raise ValueError("minimum_evidence must be positive")
         self._minimum_evidence = minimum_evidence
 
-    def should_abstain(self, context: GenerationContext, *, citations_valid: bool = True) -> bool:
+    def should_abstain(self, context: GenerationContext, *, citations_valid: bool) -> bool:
         """Decide from the evidence threshold and an injected citation-validation result."""
         return len(context.evidence) < self._minimum_evidence or not citations_valid
 
@@ -25,7 +25,7 @@ class AbstentionPolicy:
         answer: RagAnswer,
         context: GenerationContext,
         *,
-        citations_valid: bool = True,
+        citations_valid: bool,
     ) -> RagAnswer:
         """Keep a safely grounded answer or replace it with a canonical abstention."""
         if not self.should_abstain(context, citations_valid=citations_valid):

@@ -71,7 +71,12 @@ class GenerationConfig(ConfigModel):
     """Configuration for the constrained local generation profile."""
 
     model_profile: Literal["portable", "balanced", "quality"] = "portable"
+    provider: Literal["openai_compatible"] = "openai_compatible"
+    base_url: str = Field(default="http://127.0.0.1:8080", min_length=1)
     model: str = Field(default="Qwen/Qwen3-4B-Instruct-2507", min_length=1)
+    timeout: float = Field(default=180.0, gt=0)
+    evidence_max_tokens: int = Field(default=2400, ge=1)
+    max_chunks_per_document: int = Field(default=2, ge=1)
     temperature: float = Field(default=0.1, ge=0, le=2)
     max_tokens: int = Field(default=1000, ge=1)
     structured_output: bool = True

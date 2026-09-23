@@ -1,118 +1,149 @@
-# Grounded generation: current status and next milestone
+# Grounded generation
 
-## Status
+## Implemented boundary
 
-Grounded generation is **partially implemented but not runnable end to end**. The repository has
-the core domain objects and adapters, but no application service or CLI command composes them.
-
-| Capability | Status |
-| --- | --- |
-| Bounded evidence context | Implemented and unit tested |
-| Structured `RagAnswer` and citations | Implemented and unit tested |
-| Evidence-bound prompt | Implemented and unit tested |
-| OpenAI-compatible generation adapter | Implemented and unit tested |
-| Citation identity/metadata validation | Implemented and unit tested |
-| Canonical abstention object | Implemented and unit tested |
-| Generator endpoint configuration/factory | Not implemented |
-| Generated JSON parsing and recovery policy | Not implemented |
-| Router-to-generator orchestration | Not implemented |
-| `taxguide answer` or HTTP answer endpoint | Not implemented |
-| Quote-span/source-text validation | Not implemented |
-| End-to-end prompt-injection handling | Not implemented |
-| Real generation benchmark baseline | Not implemented |
-
-The `generation` section in `configs/base.yaml` selects a profile, model name, temperature, token
-limit, and structured-output preference. It does not currently define a provider, base URL,
-timeout, authentication, or context budget, and no production code reads it to build a generator.
-
-## Required orchestration
-
-The next service should make every transition explicit and fail closed:
+`taxguide answer` is the end-to-end grounded-generation entry point. It composes deterministic
+routing, tax-year resolution, retrieval, optional reranking, bounded evidence selection, an
+OpenAI-compatible generator, Pydantic parsing, grounding validation, and safe abstention.
 
 ```text
 question
+  → resolve explicit tax year
   → classify intent/topic/risk
-  → resolve tax year or return clarification
-  → retrieve with pre-ranking metadata filters
+  → clarify or reject out-of-scope requests before model calls
+  → retrieve with strict tax-year filtering
   → optionally rerank
-  → verify year and evidence threshold
+  → enforce risk-dependent evidence threshold
   → build bounded context
-  → construct grounded messages
-  → generate structured JSON
+  → generate a JSON object
   → parse as RagAnswer
-  → validate tax year, citations, source metadata, and quote spans
-  → return answered or canonical abstained result
+  → validate citations, source metadata, quote bounds, and tax year
+  → answered | clarification_required | abstained | failed
 ```
 
-`GroundedRagService` should depend on protocols/factories rather than instantiate Qdrant, model
-clients, or policy classes internally. Tests must be able to inject deterministic retrievers and
-generators without downloading models.
+The application never releases raw model text as an answer.
 
-## Proposed application result
-
-The application boundary must distinguish operational state from generated prose. A caller should
-not infer abstention by searching the answer text. The service result should contain an explicit
-status such as:
-
-- `answered`: a parsed, validated `RagAnswer` with at least one valid citation;
-- `clarification_required`: deterministic questions returned before retrieval/generation;
-- `abstained`: a canonical low-confidence answer with no unsupported tax claim;
-- `failed`: a model, parsing, vector-store, or configuration failure suitable for operator logs.
-
-Model output must never be allowed to choose `failed`, override routing filters, lower the evidence
-threshold, or mark its own citations as valid.
-
-## Validation requirements
-
-Before an answer is released, the orchestrator must verify:
-
-1. the output is valid JSON matching `RagAnswer`;
-2. non-abstained output contains citations;
-3. every citation ID maps to context actually supplied to the model;
-4. chunk ID, source URL, and title match that context;
-5. a declared quote span is inside the cited chunk and selects the claimed source text;
-6. the answer's tax year matches the resolved request year;
-7. evidence meets the router's risk-dependent minimum count;
-8. empty, conflicting, wrong-year, or invalid evidence produces abstention rather than a best guess.
-
-Retrieved source text is untrusted data. Prompt construction should delimit it as evidence and
-instruct the model not to follow commands contained inside it. Deterministic post-generation
-validation remains mandatory because prompt instructions alone are not a security boundary.
-
-## Configuration needed by the milestone
-
-The following illustrates the missing configuration contract; it is not accepted by the current
-Pydantic model yet:
+## Configuration
 
 ```yaml
 generation:
+  model_profile: portable
   provider: openai_compatible
   base_url: http://127.0.0.1:8080
   model: Qwen/Qwen3-4B-Instruct-2507
   timeout: 180.0
-  context_max_tokens: 4096
   evidence_max_tokens: 2400
+  max_chunks_per_document: 2
   temperature: 0.1
   max_tokens: 1000
   structured_output: true
 ```
 
-Provider authentication should remain optional for loopback development and required before a
-model endpoint is exposed beyond a trusted private network.
+`structured_output: true` adds the OpenAI-compatible `response_format: {type: json_object}` request.
+The prompt also includes the complete `RagAnswer` JSON schema. The response still passes through
+Pydantic; server-side JSON mode is not trusted as validation.
 
-## Definition of done
+The model server is an external process. TaxGuide does not download weights, select a GGUF file,
+set the llama.cpp context window, start the process, or supervise it.
 
-The grounded-generation milestone is complete only when:
+## CLI
 
-- a clean local setup can create/validate its vector collection and run the documented workflow;
-- configuration and factories build every runtime dependency;
-- `taxguide answer` exercises the complete path;
-- deterministic end-to-end tests cover answer, clarification, abstention, malformed JSON, model
-  failure, invalid citation, invalid quote span, insufficient evidence, and cross-year evidence;
-- one opt-in live smoke test runs against Qdrant, embeddings, reranker, and generator;
-- README, architecture, configuration, CLI examples, and operational documentation are updated in
-  the same commit;
-- assumptions, deferred work, and benchmark limitations remain explicit.
+```powershell
+uv run taxguide answer `
+  "What is the minimum standard deduction for 2025?" `
+  --mode hybrid
 
-Persistent embedding caching and production-quality benchmark baselines can follow as separate
-milestones, but the orchestrator must expose the measurements and dependency seams they require.
+uv run taxguide answer `
+  "Where do I report foreign income?" `
+  --tax-year 2025 `
+  --mode reranked `
+  --candidate-limit 10 `
+  --limit 5 `
+  --json
+```
+
+The retrieval options match `taxguide retrieve`: `dense`, `sparse`, `hybrid`, and `reranked`, plus
+Qdrant URL/collection overrides. Reranked mode requires `candidate-limit >= limit`.
+
+## Result statuses
+
+- `answered`: contains a structured answer with at least one validated citation;
+- `clarification_required`: contains deterministic questions and performs no generation;
+- `abstained`: contains a canonical low-confidence, citation-free response;
+- `failed`: contains a safe operational error and causes the CLI to exit nonzero.
+
+Out-of-scope questions abstain before retrieval. Year-sensitive questions without a year request
+clarification. Multiple query years request clarification, while an explicit `--tax-year` that
+conflicts with the question is rejected.
+
+High-risk routes require at least two selected evidence chunks; other supported routes require at
+least one. The model cannot change these thresholds.
+
+## Validation contract
+
+Before `answered`, the service verifies:
+
+1. the output is valid JSON matching `RagAnswer`;
+2. at least one citation is present;
+3. every citation ID maps to evidence supplied to the model;
+4. chunk ID, source URL, and title exactly match that evidence;
+5. cited chunks are not duplicated;
+6. quote spans stay inside the chunk and select non-blank source text;
+7. the answer year matches the resolved request year when one exists;
+8. cited evidence year matches the answer year when the answer declares one.
+
+An invalid citation, year, or quote span produces canonical abstention. Malformed structured output
+is an operational failure rather than an attempt to salvage untrusted prose.
+
+Evidence is labelled as untrusted source content in both system and user messages. The model is
+instructed never to follow commands embedded in retrieved text. This reduces prompt-injection risk
+but is not treated as a security boundary; deterministic output validation remains authoritative.
+
+## Collection lifecycle
+
+`taxguide corpus build --index` now reads the embedder dimension, creates a missing single-vector
+cosine collection, and validates an existing collection before upsert. A size mismatch, non-cosine
+distance, or named-vector schema fails before writing points.
+
+Retrieval and answer commands do not create an empty collection implicitly. Operators must run an
+indexed corpus build before querying.
+
+## Tests
+
+Deterministic tests inject fake retrievers and generators and cover:
+
+- validated answers and propagated tax-year filters;
+- missing or ambiguous tax-year clarification;
+- out-of-scope and insufficient-evidence abstention;
+- high-risk evidence thresholds;
+- retrieval/generation failures and malformed JSON;
+- invalid citation IDs, chunk identities, source metadata, quote spans, and years;
+- CLI text/JSON output and exit codes;
+- Qdrant collection creation and incompatible-schema rejection.
+
+The normal suite performs no model downloads or network calls. An opt-in live smoke test exercises
+the configured Qdrant, embedding, reranker, and generator services and requires enough indexed
+evidence to reach generation:
+
+```powershell
+$env:TAXGUIDE_RUN_GENERATION_EVAL = "1"
+uv run pytest -m generation_eval -s
+```
+
+`TAXGUIDE_GENERATION_EVAL_MODE` selects the retrieval mode (default `reranked`) and
+`TAXGUIDE_GENERATION_EVAL_QUESTION` overrides the default 2025 wealth-tax question. The test is a
+connectivity/orchestration smoke check, not a quality benchmark.
+
+## Known limitations
+
+- `evidence_max_tokens` counts stored chunk tokens, not rendered metadata, schema, or chat-template
+  overhead.
+- Quote spans verify location and non-blank text, but `Citation` does not contain a copied quote for
+  semantic equality comparison.
+- Citation traceability does not prove every generated claim is entailed by its source.
+- Router topic/audience decisions are recorded, but the grounded service currently applies only
+  the safe populated tax-year filter; corpus enrichment must precede stricter topic/audience
+  filtering to avoid false-empty retrieval.
+- The embedding cache is process-local, not integrated by the factory, and not persistent.
+- No reproducible real-corpus retrieval/generation baseline or release threshold is committed.
+- There is no authenticated HTTP API, frontend, model-process supervision, or automatic fallback.

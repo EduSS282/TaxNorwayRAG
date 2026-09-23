@@ -122,6 +122,51 @@ def test_validator_requires_citations_unless_answer_is_explicitly_abstained() ->
     assert CitationValidator().validate(answer, context, is_abstention=True) is answer
 
 
+@pytest.mark.parametrize("quote_span", [(0, 99), (3, 4)])
+def test_validator_rejects_quote_spans_without_exact_source_text(
+    quote_span: tuple[int, int],
+) -> None:
+    chunk = _chunk("a", title="First source", source_url="https://example.com/first")
+    citation = Citation(
+        citation_id="S1",
+        chunk_id=chunk.id,
+        source_title=chunk.metadata.title,
+        source_url=chunk.metadata.source_url,
+        quote_span=quote_span,
+    )
+
+    with pytest.raises(CitationValidationError, match="quote_span"):
+        CitationValidator().validate(_answer([citation]), _context(chunk))
+
+
+def test_validator_rejects_answer_tax_year_mismatches() -> None:
+    chunk = _chunk(
+        "a",
+        title="First source",
+        source_url="https://example.com/first",
+        tax_year=2026,
+    )
+    context = _context(chunk)
+    answer = _answer(map_citations(context)).model_copy(update={"tax_year": 2025})
+
+    with pytest.raises(CitationValidationError, match="resolved request tax year"):
+        CitationValidator().validate(answer, context, expected_tax_year=2026)
+
+
+def test_validator_rejects_cited_evidence_from_the_wrong_answer_year() -> None:
+    chunk = _chunk(
+        "a",
+        title="First source",
+        source_url="https://example.com/first",
+        tax_year=2025,
+    )
+    context = _context(chunk)
+    answer = _answer(map_citations(context)).model_copy(update={"tax_year": 2026})
+
+    with pytest.raises(CitationValidationError, match="tax year does not match"):
+        CitationValidator().validate(answer, context)
+
+
 def _context(*chunks: Chunk) -> GenerationContext:
     return GenerationContext(
         evidence=tuple(
@@ -142,7 +187,13 @@ def _answer(citations: list[Citation]) -> RagAnswer:
     )
 
 
-def _chunk(identity: str, *, title: str | None, source_url: str) -> Chunk:
+def _chunk(
+    identity: str,
+    *,
+    title: str | None,
+    source_url: str,
+    tax_year: int | None = None,
+) -> Chunk:
     return Chunk(
         id=identity * 64,
         document_id="d" * 64,
@@ -155,6 +206,7 @@ def _chunk(identity: str, *, title: str | None, source_url: str) -> Chunk:
             title=title,
             source_url=source_url,
             source_domain="example.com",
+            tax_year=tax_year,
             retrieved_at=datetime(2026, 9, 15, tzinfo=UTC),
             document_content_hash="e" * 64,
         ),
