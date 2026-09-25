@@ -19,6 +19,14 @@ def test_allowed_domain_and_external_domain_validation() -> None:
         validate_target("https://www.skatteetaten.no/en/login/start", HOSTS)
 
 
+def test_target_path_prefix_is_segment_bounded_and_requires_http_scheme() -> None:
+    validate_target("https://www.skatteetaten.no/en/tax", HOSTS, ("/en",))
+    with pytest.raises(DisallowedDomainError, match="outside allowed prefixes"):
+        validate_target("https://www.skatteetaten.no/english/tax", HOSTS, ("/en",))
+    with pytest.raises(DisallowedDomainError, match=r"HTTP\(S\)"):
+        validate_target("ftp://www.skatteetaten.no/en/tax", HOSTS)
+
+
 def test_url_normalization_resolves_relative_url_and_removes_fragment() -> None:
     assert normalize_url("../next/#part", "https://WWW.SKATTEETATEN.NO/en/current/") == (
         "https://www.skatteetaten.no/en/next/"

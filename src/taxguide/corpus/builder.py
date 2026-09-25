@@ -61,6 +61,7 @@ class CorpusBuilder:
         started_at = self.clock()
         failures: list[CorpusFailure] = []
         processed = 0
+        unchanged = 0
         chunks_generated = 0
         document_ids: list[str] = []
         for manifest in selection.manifests:
@@ -97,6 +98,13 @@ class CorpusBuilder:
                 continue
             if self.embedder is not None and self.vector_store is not None:
                 try:
+                    if self.vector_store.has_document_version(
+                        document_id=manifest.document_id,
+                        version_id=document.version_id,
+                        expected_chunks=len(chunks),
+                    ):
+                        unchanged += 1
+                        continue
                     for offset in range(0, len(chunks), self.embedding_batch_size):
                         batch = chunks[offset : offset + self.embedding_batch_size]
                         self.vector_store.upsert(
@@ -119,6 +127,7 @@ class CorpusBuilder:
             scanned=selection.scanned,
             selected=len(selection.manifests),
             processed=processed,
+            unchanged=unchanged,
             skipped=selection.excluded_limit,
             failed=len(failures),
             chunks_generated=chunks_generated,

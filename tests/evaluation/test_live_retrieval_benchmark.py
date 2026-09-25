@@ -13,6 +13,7 @@ from taxguide.evaluation.retrieval_benchmark import (
     format_reranker_regressions,
     load_dataset,
     normalize_source_url,
+    write_evaluation_artifact,
 )
 from taxguide.retrieval.factory import create_retriever
 
@@ -27,6 +28,11 @@ DATASET = Path("data/evaluation/retrieval_gold_v1.json")
 def test_live_retrieval_benchmark() -> None:
     dataset = load_dataset(DATASET)
     settings = load_config(Path("configs/base.yaml"))
+    collection = os.getenv("TAXGUIDE_RETRIEVAL_EVAL_COLLECTION")
+    if collection:
+        settings = settings.model_copy(
+            update={"corpus": settings.corpus.model_copy(update={"qdrant_collection": collection})}
+        )
     rows = []
     rankings_by_label: dict[str, list[list[str]]] = {}
     pipelines = (
@@ -63,4 +69,12 @@ def test_live_retrieval_benchmark() -> None:
             rankings_by_label["Hybrid+Reranker"],
         )
     )
+    report_path = os.getenv("TAXGUIDE_RETRIEVAL_EVAL_REPORT")
+    if report_path:
+        write_evaluation_artifact(
+            Path(report_path),
+            collection=settings.corpus.qdrant_collection,
+            dataset_version=dataset.version,
+            rows=rows,
+        )
     assert len(rows) == 4

@@ -48,17 +48,24 @@ def validate_target(
 ) -> None:
     parts = urlsplit(url)
     hosts = {host.lower() for host in allowed_hosts}
-    if parts.hostname is None or parts.hostname.lower() not in hosts:
+    if parts.scheme.lower() not in {"http", "https"} or parts.hostname is None:
+        raise DisallowedDomainError(f"URL must use HTTP(S): {url}")
+    if parts.hostname.lower() not in hosts:
         raise DisallowedDomainError(f"URL host is not allowed: {parts.hostname or url}")
     expected_port = 80 if parts.scheme == "http" else 443
     if parts.port is not None and parts.port != expected_port:
         raise DisallowedDomainError(f"URL uses a non-standard port: {parts.port}")
     prefixes = tuple(allowed_path_prefixes)
-    if prefixes and not any(parts.path.startswith(prefix) for prefix in prefixes):
+    if prefixes and not any(_path_prefix_matches(parts.path, prefix) for prefix in prefixes):
         raise DisallowedDomainError(f"URL path is outside allowed prefixes: {parts.path}")
     lowered = parts.path.lower()
     if not allow_restricted_areas and any(part in lowered for part in RESTRICTED_PATH_PARTS):
         raise DisallowedDomainError(f"Login/application path is not crawlable: {parts.path}")
+
+
+def _path_prefix_matches(path: str, prefix: str) -> bool:
+    normalized = prefix.rstrip("/") or "/"
+    return normalized == "/" or path == normalized or path.startswith(f"{normalized}/")
 
 
 def is_html_candidate(url: str) -> bool:

@@ -8,6 +8,7 @@ from taxguide.cli.answer import answer
 from taxguide.cli.chunk import chunk
 from taxguide.cli.corpus import app as corpus_app
 from taxguide.cli.crawl import crawl
+from taxguide.cli.index import app as index_app
 from taxguide.cli.retrieve import retrieve
 from taxguide.config.loader import load_config
 from taxguide.config.models import AppConfig
@@ -23,6 +24,7 @@ app.command(name="chunk")(chunk)
 app.command(name="crawl")(crawl)
 app.command(name="retrieve")(retrieve)
 app.add_typer(corpus_app, name="corpus")
+app.add_typer(index_app, name="index")
 
 
 def _run(

@@ -8,7 +8,7 @@ from pathlib import Path
 from statistics import mean, median
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from taxguide.domain.models import DomainModel
 from taxguide.evaluation.metrics import mean_recall_at_k, mean_reciprocal_rank
@@ -58,6 +58,23 @@ class BenchmarkRow(DomainModel):
     mean_latency_seconds: float = Field(ge=0)
     median_latency_seconds: float = Field(ge=0)
     p95_latency_seconds: float = Field(ge=0)
+
+
+class RetrievalEvaluationArtifact(DomainModel):
+    """Evaluation evidence tied to the exact candidate collection to be promoted."""
+
+    schema_version: int = Field(default=1, ge=1)
+    collection: str = Field(min_length=1)
+    dataset_version: str = Field(min_length=1)
+    evaluated_at: AwareDatetime
+    rows: list[BenchmarkRow] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def unique_pipelines(self) -> "RetrievalEvaluationArtifact":
+        names = [row.pipeline for row in self.rows]
+        if len(names) != len(set(names)):
+            raise ValueError("evaluation artifact pipeline names must be unique")
+        return self
 
 
 def normalize_source_url(value: str) -> str:
@@ -174,6 +191,30 @@ def write_report(path: Path, rows: Sequence[BenchmarkRow]) -> Path:
         json.dumps([row.model_dump() for row in rows], indent=2) + "\n", encoding="utf-8"
     )
     return output
+
+
+def write_evaluation_artifact(
+    path: Path,
+    *,
+    collection: str,
+    dataset_version: str,
+    rows: Sequence[BenchmarkRow],
+    evaluated_at: datetime | None = None,
+) -> Path:
+    """Persist a candidate-bound benchmark report for explicit promotion review."""
+    artifact = RetrievalEvaluationArtifact(
+        collection=collection,
+        dataset_version=dataset_version,
+        evaluated_at=evaluated_at or datetime.now(UTC),
+        rows=list(rows),
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(artifact.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def load_evaluation_artifact(path: Path) -> RetrievalEvaluationArtifact:
+    return RetrievalEvaluationArtifact.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 def _mean_ndcg(

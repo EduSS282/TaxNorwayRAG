@@ -1,6 +1,8 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Protocol
 from urllib.parse import urljoin
 
@@ -38,9 +40,13 @@ class SafeHttpClient:
         transport: httpx.BaseTransport | None = None,
         sleeper: Callable[[float], None] = time.sleep,
         max_redirects: int = 10,
+        max_retry_after_seconds: float = 60.0,
     ) -> None:
+        if max_retry_after_seconds < 0:
+            raise ValueError("max_retry_after_seconds must be non-negative")
         self.max_retries = max_retries
         self.request_delay = request_delay
+        self.max_retry_after_seconds = max_retry_after_seconds
         self.max_response_bytes = max_response_bytes
         self.target_validator = target_validator
         self.sleeper = sleeper
@@ -73,9 +79,11 @@ class SafeHttpClient:
             current = urljoin(current, location)
 
     def _request_with_retries(self, url: str) -> HttpResponse:
+        retry_delay = 0.0
         for attempt in range(self.max_retries + 1):
-            if self._made_request and self.request_delay:
-                self.sleeper(self.request_delay)
+            delay = max(self.request_delay, retry_delay) if self._made_request else 0.0
+            if delay:
+                self.sleeper(delay)
             self._made_request = True
             try:
                 with self.client.stream("GET", url) as response:
@@ -94,7 +102,27 @@ class SafeHttpClient:
                 continue
             if result.status_code not in TRANSIENT_STATUSES or attempt == self.max_retries:
                 return result
+            retry_delay = self._retry_delay(result.headers, attempt)
         raise AssertionError("retry loop did not return")
+
+    def _retry_delay(self, headers: dict[str, str], attempt: int) -> float:
+        value = headers.get("retry-after")
+        if value is not None:
+            try:
+                seconds = float(value)
+            except ValueError:
+                try:
+                    retry_at = parsedate_to_datetime(value)
+                    if retry_at.tzinfo is None:
+                        retry_at = retry_at.replace(tzinfo=UTC)
+                    seconds = (retry_at - datetime.now(UTC)).total_seconds()
+                except (TypeError, ValueError, OverflowError):
+                    seconds = -1.0
+                else:
+                    seconds = max(0.0, seconds)
+            if seconds >= 0:
+                return min(seconds, self.max_retry_after_seconds)
+        return min(float(2**attempt), self.max_retry_after_seconds)
 
     def _read_limited(self, response: httpx.Response, url: str) -> bytes:
         declared = response.headers.get("content-length")

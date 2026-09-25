@@ -12,6 +12,8 @@ An HTTP API and frontend are not implemented.
 ## Implemented today
 
 - bounded crawling of public `skatteetaten.no` HTML, with manifests and duplicate detection;
+- domain/path-constrained crawling with robots and bounded `Retry-After` handling, plus source
+  change detection across recrawls;
 - HTML parsing, normalization, and deterministic document/version identities;
 - fixed-token, recursive, and structural chunking;
 - Ollama and local `sentence-transformers` embedding adapters;
@@ -20,6 +22,8 @@ An HTTP API and frontend are not implemented.
 - strict pre-ranking tax-year filters and cross-year result validation;
 - deterministic topic, intent, risk, and route classification;
 - automatic creation and schema validation of the Qdrant collection during indexed corpus builds;
+- incremental indexing that skips already indexed document versions, and candidate collection
+  promotion/rollback through stable Qdrant aliases;
 - bounded generation context, OpenAI-compatible local generation, Pydantic JSON parsing, citation,
   quote-span and tax-year validation, explicit application statuses, and safe abstention;
 - unit/integration evaluation utilities and an opt-in live retrieval benchmark harness.
@@ -142,6 +146,8 @@ uv run mypy src
 The live retrieval benchmark and grounded-generation smoke test are opt-in and require a populated
 Qdrant collection plus the configured model services. See [retrieval](docs/retrieval.md) and
 [grounded generation](docs/generation.md). No reproducible real-corpus baseline is committed yet.
+Candidate indexing, live evaluation artifacts, and reviewed alias promotion/rollback are described
+in [index lifecycle](docs/index-lifecycle.md).
 
 ## Current limitations and next milestone
 
@@ -176,6 +182,7 @@ contract and its remaining limitations.
 - [Crawler](docs/crawler.md)
 - [Corpus workflow](docs/corpus.md)
 - [Retrieval and evaluation](docs/retrieval.md)
+- [Candidate index lifecycle](docs/index-lifecycle.md)
 - [Tax routing](docs/routing.md)
 - [Reranker service](docs/reranker-service.md)
 - [Architecture reference](Design/norway_tax_rag_architecture.md)

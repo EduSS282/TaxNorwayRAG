@@ -58,6 +58,12 @@ and temporal applicability where it is known.
 The corpus builder can derive a tax year from an explicit version URL. Missing temporal knowledge
 stays missing. See ADR 0004 for the versioning decision.
 
+Crawler manifests record content-change status against the previous saved manifest. During
+indexing, the corpus builder checks for the exact document/version in its target collection and
+skips repeat embedding when all expected chunks are present. Physical candidate collections can be
+evaluated and promoted through stable Qdrant aliases, with one previous collection retained for rollback; see
+[index lifecycle](index-lifecycle.md) and ADR 0007.
+
 ## Retrieval pipeline
 
 ```text
@@ -138,7 +144,9 @@ described as a persistent production cache.
 
 Unit-tested utilities exist for Recall@K, MRR, nDCG, retrieval latency, citation precision/recall,
 faithfulness, answer correctness, and abstention accuracy. The live retrieval test is opt-in and
-depends on operator-managed services and data.
+depends on operator-managed services and data. It can produce a candidate-bound evaluation
+artifact, but the repository still lacks a committed real-corpus gold set, hardware manifest,
+release thresholds, and baseline results.
 
 There is currently no checked-in real-corpus benchmark baseline with repeatable hardware/model
 metadata and release thresholds. The checked-in generation evaluation fixture contains only two
@@ -177,3 +185,5 @@ The grounded CLI milestone is complete, but these gaps remain:
 5. enrich corpus topic/audience metadata before applying every router filter to retrieval;
 6. add authenticated HTTP/API deployment, observability, and service supervision;
 7. execute and record the existing opt-in live smoke test on the target hardware and corpus.
+8. add safe candidate collection cleanup and richer immutable evaluation provenance (model/runtime
+   revisions and hardware manifest).

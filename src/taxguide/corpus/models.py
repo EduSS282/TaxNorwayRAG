@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from taxguide.crawling.models import WizardMetadata
+from taxguide.crawling.models import SourceChangeStatus, WizardMetadata
 from taxguide.domain.enums import PageType
 from taxguide.domain.models import Digest
 
@@ -21,6 +21,8 @@ class CrawlManifest(CorpusModel):
     http_status: int
     content_type: str
     content_sha256: Digest
+    previous_content_sha256: Digest | None = None
+    change_status: SourceChangeStatus = SourceChangeStatus.NEW
     language: str | None = None
     page_type: PageType
     wizard: WizardMetadata | None = None
@@ -76,6 +78,7 @@ class CorpusBuildReport(CorpusModel):
     scanned: int = Field(ge=0)
     selected: int = Field(ge=0)
     processed: int = Field(ge=0)
+    unchanged: int = Field(default=0, ge=0)
     skipped: int = Field(ge=0)
     failed: int = Field(ge=0)
     chunks_generated: int = Field(ge=0)

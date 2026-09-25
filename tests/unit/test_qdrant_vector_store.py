@@ -46,6 +46,19 @@ class FakeQdrantClient:
         self.points = points
         self.upsert_calls.append(points)
 
+    def count(
+        self, *, collection_name: str, count_filter: Any | None = None, exact: bool = True
+    ) -> object:
+        assert collection_name == "taxguide_chunks"
+        assert exact is True
+        count = sum(
+            point["payload"]["document_id"] == count_filter.must[0].match.value
+            and point["payload"]["metadata"]["version_id"] == count_filter.must[1].match.value
+            for batch in self.upsert_calls
+            for point in batch
+        )
+        return SimpleNamespace(count=count)
+
     def query_points(
         self, *, collection_name: str, query: list[float], limit: int, with_payload: bool
     ) -> "FakeQueryResponse":
@@ -227,6 +240,31 @@ def test_repeated_upserts_target_the_same_deterministic_point() -> None:
 
     assert len(client.upsert_calls) == 2
     assert client.upsert_calls[0][0]["id"] == client.upsert_calls[1][0]["id"]
+
+
+def test_qdrant_checks_for_an_existing_document_version() -> None:
+    client = FakeQdrantClient()
+    store = QdrantVectorStore(client)
+    chunk = _chunk()
+    chunk = chunk.model_copy(
+        update={"metadata": chunk.metadata.model_copy(update={"version_id": "f" * 64})}
+    )
+
+    assert not store.has_document_version(
+        document_id=chunk.document_id, version_id="e" * 64, expected_chunks=1
+    )
+    store.upsert([chunk], [(0.1, 0.2)])
+
+    assert store.has_document_version(
+        document_id=chunk.document_id,
+        version_id=chunk.metadata.version_id or "",
+        expected_chunks=1,
+    )
+    assert not store.has_document_version(
+        document_id=chunk.document_id,
+        version_id=chunk.metadata.version_id or "",
+        expected_chunks=2,
+    )
 
 
 def test_qdrant_http_errors_include_status_and_response_body() -> None:

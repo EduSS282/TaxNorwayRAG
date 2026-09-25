@@ -23,6 +23,10 @@ class VectorStore(Protocol):
 
     def upsert(self, chunks: list[Chunk], embeddings: EmbeddingBatch) -> None: ...
 
+    def has_document_version(
+        self, *, document_id: str, version_id: str, expected_chunks: int
+    ) -> bool: ...
+
     def search(
         self, query: Embedding, *, limit: int, filters: "RetrievalFilter | None" = None
     ) -> list[ScoredChunk]: ...

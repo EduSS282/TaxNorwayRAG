@@ -50,7 +50,7 @@ def _pipeline_factory(settings: AppConfig) -> Callable[[CrawlManifest], Ingestio
     return factory
 
 
-def _indexing(settings: AppConfig) -> tuple[Embedder, VectorStore]:
+def _indexing(settings: AppConfig, collection: str | None = None) -> tuple[Embedder, VectorStore]:
     try:
         from qdrant_client import QdrantClient
     except ImportError as exc:
@@ -58,7 +58,7 @@ def _indexing(settings: AppConfig) -> tuple[Embedder, VectorStore]:
     embedder = create_embedder(settings.corpus)
     store = QdrantVectorStore(
         cast(QdrantClientProtocol, QdrantClient(url=settings.corpus.qdrant_url)),
-        collection_name=settings.corpus.qdrant_collection,
+        collection_name=collection or settings.corpus.qdrant_collection,
     )
     store.ensure_collection(embedder.dimension)
     return embedder, cast(VectorStore, store)
@@ -108,6 +108,9 @@ def build(
     list_documents: Annotated[bool, typer.Option("--list")] = False,
     as_json: Annotated[bool, typer.Option("--json")] = False,
     index: Annotated[bool, typer.Option()] = False,
+    collection: Annotated[
+        str | None, typer.Option(help="Physical index collection override.")
+    ] = None,
     manifest_dir: Annotated[Path | None, typer.Option()] = None,
     raw_dir: Annotated[Path | None, typer.Option()] = None,
     limit: Annotated[int | None, typer.Option(min=1)] = None,
@@ -142,7 +145,7 @@ def build(
         embedder: Embedder | None = None
         store: VectorStore | None = None
         if index:
-            embedder, store = _indexing(settings)
+            embedder, store = _indexing(settings, collection)
         report = CorpusBuilder(
             _pipeline_factory(settings),
             chunker,
@@ -155,7 +158,7 @@ def build(
             filters,
             raw_directory=source_raw,
             source_manifest_directory=source_manifests,
-            vector_collection=settings.corpus.qdrant_collection if index else None,
+            vector_collection=(collection or settings.corpus.qdrant_collection) if index else None,
         )
         report_path = FileCorpusReportRepository(settings.corpus.report_directory).save(report)
     except (CorpusError, TaxguideError, ValueError, RuntimeError) as exc:
@@ -173,6 +176,7 @@ def build(
         "Corpus build complete\n\n"
         f"Selected:         {report.selected}\n"
         f"Processed:        {report.processed}\n"
+        f"Unchanged:        {report.unchanged}\n"
         f"Skipped:          {report.skipped}\n"
         f"Failed:           {report.failed}\n"
         f"Chunks generated: {report.chunks_generated}\n"

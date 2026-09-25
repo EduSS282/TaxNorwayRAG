@@ -8,4 +8,6 @@ class Crawler(Protocol):
 
 
 class CrawlArtifactRepository(Protocol):
+    def content_hash_for(self, document_id: str) -> str | None: ...
+
     def save(self, page: CrawledPage) -> None: ...

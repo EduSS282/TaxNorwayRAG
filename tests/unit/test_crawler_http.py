@@ -72,3 +72,63 @@ def test_response_size_is_limited() -> None:
     with pytest.raises(ResponseTooLargeError):
         client.fetch("https://www.skatteetaten.no/large")
     client.close()
+
+
+def test_retry_after_is_honored_and_capped() -> None:
+    calls = 0
+    waits: list[float] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(429, headers={"Retry-After": "9"})
+        return httpx.Response(200, content=b"ok")
+
+    client = SafeHttpClient(
+        user_agent="crawler-test",
+        connect_timeout=1,
+        read_timeout=1,
+        max_retries=1,
+        request_delay=0,
+        max_response_bytes=100,
+        target_validator=lambda _: None,
+        transport=httpx.MockTransport(handler),
+        sleeper=waits.append,
+        max_retry_after_seconds=4,
+    )
+
+    assert client.fetch("https://www.skatteetaten.no/a").status_code == 200
+    assert waits == [4]
+    client.close()
+
+
+def test_invalid_retry_after_uses_exponential_backoff() -> None:
+    calls = 0
+    waits: list[float] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            503 if calls == 1 else 200,
+            headers={"Retry-After": "not-a-date"},
+            content=b"ok",
+        )
+
+    client = SafeHttpClient(
+        user_agent="crawler-test",
+        connect_timeout=1,
+        read_timeout=1,
+        max_retries=1,
+        request_delay=0,
+        max_response_bytes=100,
+        target_validator=lambda _: None,
+        transport=httpx.MockTransport(handler),
+        sleeper=waits.append,
+        max_retry_after_seconds=10,
+    )
+
+    assert client.fetch("https://www.skatteetaten.no/a").status_code == 200
+    assert waits == [1]
+    client.close()

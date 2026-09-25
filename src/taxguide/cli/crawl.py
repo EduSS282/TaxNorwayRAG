@@ -48,6 +48,7 @@ def crawl(
             read_timeout=crawler_config.read_timeout,
             max_retries=crawler_config.max_retries,
             request_delay=delay if delay is not None else crawler_config.request_delay,
+            max_retry_after_seconds=crawler_config.max_retry_after_seconds,
             max_response_bytes=crawler_config.max_response_bytes,
             target_validator=target_validator,
         )
@@ -80,6 +81,9 @@ def crawl(
         f"Fetched:             {result.fetched}\n"
         f"Skipped:             {result.skipped}\n"
         f"Duplicates:          {result.duplicates}\n"
+        f"New:                 {result.new_pages}\n"
+        f"Unchanged:           {result.unchanged_pages}\n"
+        f"Changed:             {result.changed_pages}\n"
         f"Failed:              {result.failed}\n"
         f"Interactive wizards: {result.interactive_wizards}\n\n"
         "Artifacts:\n"

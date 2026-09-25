@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -40,3 +41,19 @@ class FileCrawlArtifactRepository:
             manifest_path,
             (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
         )
+
+    def content_hash_for(self, document_id: str) -> str | None:
+        """Return the latest stored capture hash, or None for a first capture."""
+        manifest_path = self.manifest_directory / f"{document_id}.json"
+        try:
+            value = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise CrawlerError(
+                f"Cannot read previous crawl manifest {manifest_path}: {exc}"
+            ) from exc
+        content_hash = value.get("content_sha256") if isinstance(value, dict) else None
+        if not isinstance(content_hash, str) or re.fullmatch(r"[a-f0-9]{64}", content_hash) is None:
+            raise CrawlerError(f"Previous crawl manifest has no content hash: {manifest_path}")
+        return content_hash

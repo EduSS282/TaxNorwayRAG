@@ -19,6 +19,10 @@ class QdrantClient(Protocol):
 
     def upsert(self, *, collection_name: str, points: list[dict[str, Any]]) -> None: ...
 
+    def count(
+        self, *, collection_name: str, count_filter: Any | None = None, exact: bool = True
+    ) -> Any: ...
+
     def query_points(
         self,
         *,
@@ -118,6 +122,33 @@ class QdrantVectorStore:
                 self._client.upsert(collection_name=self._collection_name, points=points)
             except Exception as exc:
                 raise _qdrant_error(exc) from exc
+
+    def has_document_version(
+        self, *, document_id: str, version_id: str, expected_chunks: int
+    ) -> bool:
+        """Check that every expected chunk for this source version is indexed."""
+        if expected_chunks < 0:
+            raise ValueError("expected_chunks must be non-negative")
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        query_filter = Filter(
+            must=[
+                FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+                FieldCondition(key="metadata.version_id", match=MatchValue(value=version_id)),
+            ]
+        )
+        try:
+            count = cast(
+                int,
+                self._client.count(
+                    collection_name=self._collection_name,
+                    count_filter=query_filter,
+                    exact=True,
+                ).count,
+            )
+            return count == expected_chunks
+        except Exception as exc:
+            raise _qdrant_error(exc) from exc
 
     def search(
         self, query: Embedding, *, limit: int, filters: RetrievalFilter | None = None

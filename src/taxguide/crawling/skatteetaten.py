@@ -16,6 +16,7 @@ from taxguide.crawling.models import (
     CrawlFailure,
     CrawlRequest,
     CrawlResult,
+    SourceChangeStatus,
 )
 from taxguide.crawling.storage import FileCrawlArtifactRepository
 from taxguide.crawling.urls import (
@@ -87,6 +88,23 @@ class SkatteetatenCrawler:
                 self._validate(response.url)
                 visited.add(normalize_url(response.url))
                 page = self._page(original_url, response, content_ids)
+                previous_hash = self.repository.content_hash_for(page.document_id)
+                change_status = (
+                    SourceChangeStatus.NEW
+                    if previous_hash is None
+                    else (
+                        SourceChangeStatus.UNCHANGED
+                        if previous_hash == page.content_sha256
+                        else SourceChangeStatus.CHANGED
+                    )
+                )
+                page = type(page).model_validate(
+                    {
+                        **page.model_dump(),
+                        "previous_content_sha256": previous_hash,
+                        "change_status": change_status,
+                    }
+                )
                 self.repository.save(page)
                 pages.append(page)
                 content_ids.setdefault(page.content_sha256, page.document_id)
@@ -135,6 +153,11 @@ class SkatteetatenCrawler:
             fetched=len(pages),
             skipped=len(skipped),
             duplicates=sum(page.duplicate_of is not None for page in pages),
+            new_pages=sum(page.change_status is SourceChangeStatus.NEW for page in pages),
+            unchanged_pages=sum(
+                page.change_status is SourceChangeStatus.UNCHANGED for page in pages
+            ),
+            changed_pages=sum(page.change_status is SourceChangeStatus.CHANGED for page in pages),
             failed=len(failures),
             interactive_wizards=sum(
                 page.page_type is PageType.INTERACTIVE_WIZARD for page in pages

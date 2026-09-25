@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from taxguide.crawling.http import HttpResponse
-from taxguide.crawling.models import CrawlRequest
+from taxguide.crawling.models import CrawlRequest, SourceChangeStatus
 from taxguide.crawling.skatteetaten import SkatteetatenCrawler
 from taxguide.crawling.storage import FileCrawlArtifactRepository
 from taxguide.domain.enums import PageType
@@ -152,3 +152,38 @@ def test_integration_crawl_persists_manifest_and_local_source_handoff(tmp_path: 
         assert "raw_html" not in manifest
         loaded = LocalHtmlSource(clock=lambda: NOW).load(raw_path, page.original_url)
         assert loaded.content_hash == page.content_sha256
+
+
+def test_recrawl_reports_new_unchanged_and_changed_source_versions(tmp_path: Path) -> None:
+    repository = FileCrawlArtifactRepository(tmp_path)
+    original = "<html><main><p>First version</p></main></html>"
+    changed = "<html><main><p>Second version</p></main></html>"
+
+    new = SkatteetatenCrawler(
+        FakeHttp(
+            {f"{BASE}/robots.txt": robots(), f"{BASE}/tax": response(f"{BASE}/tax", original)}
+        ),
+        repository,
+        clock=lambda: NOW,
+    ).crawl(CrawlRequest(url=f"{BASE}/tax", max_pages=1, follow_links=False))
+    unchanged = SkatteetatenCrawler(
+        FakeHttp(
+            {f"{BASE}/robots.txt": robots(), f"{BASE}/tax": response(f"{BASE}/tax", original)}
+        ),
+        repository,
+        clock=lambda: NOW,
+    ).crawl(CrawlRequest(url=f"{BASE}/tax", max_pages=1, follow_links=False))
+    updated = SkatteetatenCrawler(
+        FakeHttp({f"{BASE}/robots.txt": robots(), f"{BASE}/tax": response(f"{BASE}/tax", changed)}),
+        repository,
+        clock=lambda: NOW,
+    ).crawl(CrawlRequest(url=f"{BASE}/tax", max_pages=1, follow_links=False))
+
+    assert new.pages[0].change_status is SourceChangeStatus.NEW
+    assert new.new_pages == 1
+    assert unchanged.pages[0].change_status is SourceChangeStatus.UNCHANGED
+    assert unchanged.unchanged_pages == 1
+    assert unchanged.pages[0].previous_content_sha256 == unchanged.pages[0].content_sha256
+    assert updated.pages[0].change_status is SourceChangeStatus.CHANGED
+    assert updated.changed_pages == 1
+    assert updated.pages[0].previous_content_sha256 == unchanged.pages[0].content_sha256

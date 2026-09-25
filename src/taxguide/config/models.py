@@ -35,6 +35,7 @@ class CrawlerConfig(ConfigModel):
     read_timeout: float = Field(default=20.0, gt=0)
     max_retries: int = Field(default=2, ge=0, le=10)
     request_delay: float = Field(default=0.75, ge=0)
+    max_retry_after_seconds: float = Field(default=60.0, ge=0)
     max_response_bytes: int = Field(default=5_000_000, gt=0)
     max_pages: int = Field(default=50, ge=1)
     max_depth: int = Field(default=2, ge=0)

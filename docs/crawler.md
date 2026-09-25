@@ -24,8 +24,10 @@ uv run taxguide crawl "https://www.skatteetaten.no/en/person/taxes/get-the-taxes
 ```
 
 `--delay`, `--output-dir`, and `--json` control pacing, the artifact root, and
-machine-readable output. Configuration defaults live under `crawler` in
-`configs/base.yaml`.
+machine-readable output. `Retry-After` is honored for 429/5xx responses, bounded
+by `crawler.max_retry_after_seconds` (60 seconds by default); malformed or
+missing values use bounded exponential backoff. Configuration defaults live
+under `crawler` in `configs/base.yaml`.
 
 ## Artifacts and ingestion handoff
 
@@ -38,10 +40,16 @@ data/manifests/crawl/<id>.json
 
 The manifest records original, final, and discovered canonical URLs, retrieval
 time, HTTP status and content type, SHA-256, language hint, page classification,
-wizard metadata, and content-duplicate provenance. IDs are deterministic from
+wizard metadata, and content-duplicate provenance. Recrawls also record
+`change_status` (`new`, `unchanged`, or `changed`) and the prior content hash
+when one exists; the CLI summarizes all three categories. IDs are deterministic from
 the normalized final URL; discovered canonical metadata is retained without
-allowing two fetched aliases to overwrite one another. Unchanged recrawls replace
-the same artifact paths.
+allowing two fetched aliases to overwrite one another. Recrawls replace the same
+artifact paths while preserving the comparison result in the new manifest.
+
+The crawler stays inside explicitly allowed hosts and path prefixes. Prefixes
+are path-segment boundaries (`/en` allows `/en/...`, not `/english/...`), only
+HTTP(S) and standard ports are accepted, and each redirect is checked again.
 
 The saved HTML can be passed directly to the existing local ingestion command:
 

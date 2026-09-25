@@ -61,6 +61,11 @@ cells are reported as `n/a`. Success@1/5 reports the fraction of queries with at
 source at the cutoff. The live output also lists queries where Hybrid@5 found a relevant source but
 reranking moved its first relevant source lower or out of the final five.
 
+Set `TAXGUIDE_RETRIEVAL_EVAL_COLLECTION` to evaluate a physical candidate instead of the configured
+collection, and `TAXGUIDE_RETRIEVAL_EVAL_REPORT` to save a JSON artifact bound to that collection
+and gold-dataset version. This artifact is the evidence accepted by index promotion; it does not
+certify quality or choose release thresholds.
+
 It is intentionally excluded from normal tests. With a populated configured Qdrant collection and
 the configured embedding and reranker services available, run:
 
@@ -69,6 +74,11 @@ TAXGUIDE_RUN_RETRIEVAL_EVAL=1 uv run pytest -m retrieval_eval -s
 ```
 
 The benchmark never starts services, downloads models, or creates SSH tunnels.
+
+Promotion requires reviewing the candidate-bound artifact and explicitly passing
+`--evaluation-passed`. The command checks the collection name and presence of Dense, Sparse,
+Hybrid, and Hybrid+Reranker rows, then atomically updates the stable Qdrant aliases. See
+[index lifecycle](index-lifecycle.md) for the workflow and its limitations.
 
 Results are exploratory until the gold set, corpus manifest, model revisions/quantizations,
 hardware/runtime manifest, thresholds, and generated report are versioned together. The small

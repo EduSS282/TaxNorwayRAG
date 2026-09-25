@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -9,8 +10,10 @@ from taxguide.evaluation.retrieval_benchmark import (
     format_report,
     format_reranker_regressions,
     load_dataset,
+    load_evaluation_artifact,
     normalize_source_url,
     unique_ranked_urls,
+    write_evaluation_artifact,
 )
 
 DATASET = Path("data/evaluation/retrieval_gold_v1.json")
@@ -71,6 +74,26 @@ def test_benchmark_aggregates_graded_metrics_latencies_and_report() -> None:
     assert row.mrr == 1
     assert 0 < row.ndcg_at_5 < 1
     assert "Dense" in format_report([row])
+
+
+def test_candidate_evaluation_artifact_round_trips_candidate_and_dataset(tmp_path: Path) -> None:
+    dataset = _dataset_with_two_gold_urls()
+    row = benchmark_row("Dense", [["https://example.com/a"]], dataset.queries, [0.2])
+    path = tmp_path / "candidate.json"
+
+    write_evaluation_artifact(
+        path,
+        collection="candidate-2026-09",
+        dataset_version=dataset.version,
+        rows=[row],
+        evaluated_at=datetime(2026, 9, 24, tzinfo=UTC),
+    )
+
+    artifact = load_evaluation_artifact(path)
+    assert artifact.collection == "candidate-2026-09"
+    assert artifact.dataset_version == dataset.version
+    assert artifact.evaluated_at == datetime(2026, 9, 24, tzinfo=UTC)
+    assert artifact.rows == [row]
 
 
 def test_five_result_pipeline_marks_at_ten_metrics_not_applicable() -> None:

@@ -73,10 +73,19 @@ def test_missing_raw_artifact_is_reported_without_aborting(tmp_path: Path) -> No
 class RecordingStore:
     def __init__(self) -> None:
         self.batches: list[list[Chunk]] = []
+        self.versions: dict[tuple[str, str | None], set[str]] = {}
+
+    def has_document_version(
+        self, *, document_id: str, version_id: str, expected_chunks: int
+    ) -> bool:
+        return len(self.versions.get((document_id, version_id), set())) == expected_chunks
 
     def upsert(self, chunks: list[Chunk], embeddings: list[tuple[float, ...]]) -> None:
         assert len(chunks) == len(embeddings)
         self.batches.append(chunks)
+        for chunk in chunks:
+            key = (chunk.document_id, chunk.metadata.version_id)
+            self.versions.setdefault(key, set()).add(chunk.id)
 
     def search(self, query: tuple[float, ...], *, limit: int) -> list[object]:
         return []
@@ -105,6 +114,40 @@ def test_indexing_uses_existing_embedder_and_vector_store(tmp_path: Path) -> Non
     assert report.embedding_provider == "ollama"
     assert report.embedding_model == "mock-deterministic-v1"
     assert sum(len(batch) for batch in store.batches) == report.chunks_generated
+
+
+def test_repeated_index_build_skips_an_already_indexed_source_version(tmp_path: Path) -> None:
+    html = "<html><main><h1>Tax</h1><p>Stable source content.</p></main></html>"
+    item = make_manifest("incremental").model_copy(
+        update={"content_sha256": sha256(html.encode()).hexdigest()}
+    )
+    (tmp_path / f"{item.document_id}.html").write_text(html, encoding="utf-8")
+    store = RecordingStore()
+    builder = CorpusBuilder(
+        pipeline,
+        StructuralChunker(),
+        embedder=MockEmbedder(),
+        vector_store=store,
+    )
+    selection = CorpusSelection(manifests=[item], scanned=1)
+
+    first = builder.build(
+        selection,
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    batches_after_first = len(store.batches)
+    second = builder.build(
+        selection,
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+
+    assert first.processed == 1 and first.unchanged == 0
+    assert second.processed == 0 and second.unchanged == 1
+    assert len(store.batches) == batches_after_first
 
 
 def test_annual_versions_keep_distinct_identity_through_vector_indexing(tmp_path: Path) -> None:
