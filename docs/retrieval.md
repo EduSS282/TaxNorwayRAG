@@ -27,8 +27,11 @@ If the query itself mentions one year, the CLI resolves it automatically and app
 pre-ranking filter. An explicit `--tax-year` that conflicts with the query is rejected, as is a
 query containing multiple distinct years. Higher application layers can provide conversation,
 identified-form, and current-applicable-year hints through `TaxYearResolutionContext`; precedence
-is explicit query, conversation, form, then current year. A required but unresolved year asks for
-clarification instead of silently selecting one.
+is explicit query, conversation, form, then current year. `GroundedRagService` accepts an injected
+`tax_year_context_provider(question)` for those trusted application hints. Its default is empty,
+so a year-sensitive grounded answer asks for clarification unless the query or caller supplies a
+year. A context that marks the year as required also asks for clarification before retrieval when
+no year resolves; it never silently selects one.
 
 `TaxYearAwareRetriever` also validates returned payloads. A vector-store or retriever adapter that
 ignores the filter and returns a different or unknown year raises `CrossYearRetrievalError`, so

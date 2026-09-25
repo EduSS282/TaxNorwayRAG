@@ -1,5 +1,6 @@
 """End-to-end tests for deterministic grounded-generation orchestration."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import pytest
@@ -10,6 +11,7 @@ from taxguide.domain.models import Chunk, ChunkMetadata
 from taxguide.generation.base import ChatMessage
 from taxguide.generation.models import Citation, ConfidenceLevel, RagAnswer
 from taxguide.generation.service import GroundedRagService, GroundedRagStatus
+from taxguide.query.tax_year import TaxYearResolutionContext
 from taxguide.retrieval.filters import RetrievalFilter
 from taxguide.rules.factory import create_tax_router
 from taxguide.vectorstores.base import ScoredChunk
@@ -87,6 +89,44 @@ def test_service_requests_clarification_before_runtime_calls() -> None:
     result = _service(retriever, generator).answer(
         "Where do I report foreign income on my tax return?"
     )
+
+    assert result.status is GroundedRagStatus.CLARIFICATION_REQUIRED
+    assert result.clarification_questions == ("Which tax year does your question concern?",)
+    assert retriever.calls == []
+    assert generator.calls == []
+
+
+def test_service_uses_injected_conversation_tax_year_before_retrieval() -> None:
+    chunk = _chunk("a", tax_year=2025)
+    retriever = RecordingRetriever([ScoredChunk(chunk=chunk, score=0.9)])
+    generator = StubGenerator(_answer(chunk, tax_year=2025).model_dump_json())
+    service = _service(
+        retriever,
+        generator,
+        tax_year_context_provider=lambda question: (
+            TaxYearResolutionContext(conversation_tax_year=2025)
+            if "deduction" in question
+            else TaxYearResolutionContext()
+        ),
+    )
+
+    result = service.answer("Explain the standard deduction.")
+
+    assert result.status is GroundedRagStatus.ANSWERED
+    assert result.answer is not None and result.answer.tax_year == 2025
+    assert retriever.calls[0][2] == RetrievalFilter(tax_year=2025)
+
+
+def test_service_clarifies_when_context_requires_an_unresolved_year() -> None:
+    retriever = RecordingRetriever([])
+    generator = StubGenerator("unused")
+    service = _service(
+        retriever,
+        generator,
+        tax_year_context_provider=lambda _question: TaxYearResolutionContext(require_tax_year=True),
+    )
+
+    result = service.answer("Explain this tax form field.")
 
     assert result.status is GroundedRagStatus.CLARIFICATION_REQUIRED
     assert result.clarification_questions == ("Which tax year does your question concern?",)
@@ -209,6 +249,8 @@ def test_service_abstains_when_generated_grounding_is_invalid(invalid_kind: str)
 def _service(
     retriever: RecordingRetriever,
     generator: StubGenerator,
+    *,
+    tax_year_context_provider: Callable[[str], TaxYearResolutionContext] | None = None,
 ) -> GroundedRagService:
     return GroundedRagService(
         router=create_tax_router(),
@@ -217,6 +259,7 @@ def _service(
         generator=generator,
         temperature=0.1,
         max_tokens=100,
+        tax_year_context_provider=tax_year_context_provider,
     )
 
 

@@ -20,10 +20,15 @@ residency, and appeal terms are always high risk.
 
 `DeterministicTaxRouter` combines injected classifiers and returns data, not prose:
 
-- `retrieve` selects controlled topic, audience, official-source, and optional year filters;
+- `retrieve` selects controlled topic, audience, official-source, and optional year constraints;
 - `clarify` is used when a year-sensitive or high-risk query has no explicit resolved tax year;
 - `abstain` is used for unsupported out-of-scope requests.
 
 High-risk routes require at least two evidence chunks. Routing does not infer a tax year, user
 residency, eligibility, or any future `TaxProfile` field. A separate tax-year resolver can pass its
-explicit result into `route(..., tax_year=...)`.
+explicit result into `route(..., tax_year=...)`. In the current grounded-generation service, only
+the resolved tax-year constraint is passed to retrieval. Topic and audience metadata are not yet
+enriched consistently on corpus chunks, and official-source eligibility currently comes from the
+Skatteetaten-only crawl allowlist rather than a runtime source filter. Do not treat those returned
+routing constraints as applied filters until corpus enrichment and retrieval integration are
+implemented.

@@ -113,7 +113,8 @@ routing.
 - `AbstentionPolicy`, which produces a canonical non-claiming response;
 - retrieval and generation evaluation models and metrics.
 
-The service resolves an explicit year, routes the question, retrieves and checks temporal evidence,
+The service resolves a year from the query and an optional injected trusted context provider,
+routes the question, retrieves and checks temporal evidence,
 enforces the risk-dependent evidence count, builds context, calls the configured generator, parses
 the response as `RagAnswer`, validates grounding, and returns an explicit status. Malformed JSON or
 runtime failures return `failed`; insufficient or invalid grounding returns a canonical

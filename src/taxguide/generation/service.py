@@ -1,5 +1,6 @@
 """End-to-end orchestration for evidence-bound tax answers."""
 
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Self
 
@@ -13,7 +14,11 @@ from taxguide.generation.base import Generator
 from taxguide.generation.models import RagAnswer
 from taxguide.generation.prompts import build_grounded_messages
 from taxguide.generation.validation import CitationValidationError, CitationValidator
-from taxguide.query.tax_year import TaxYearResolutionSource, TaxYearResolver
+from taxguide.query.tax_year import (
+    TaxYearResolutionContext,
+    TaxYearResolutionSource,
+    TaxYearResolver,
+)
 from taxguide.retrieval.filters import RetrievalFilter
 from taxguide.retrieval.hybrid import Retriever
 from taxguide.rules.base import TaxRouter
@@ -77,6 +82,7 @@ class GroundedRagService:
         temperature: float,
         max_tokens: int,
         tax_year_resolver: TaxYearResolver | None = None,
+        tax_year_context_provider: Callable[[str], TaxYearResolutionContext] | None = None,
         citation_validator: CitationValidator | None = None,
     ) -> None:
         if not 0 <= temperature <= 2:
@@ -90,6 +96,9 @@ class GroundedRagService:
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._tax_year_resolver = tax_year_resolver or TaxYearResolver()
+        self._tax_year_context_provider = tax_year_context_provider or (
+            lambda _question: TaxYearResolutionContext()
+        )
         self._citation_validator = citation_validator or CitationValidator()
 
     def answer(
@@ -105,7 +114,9 @@ class GroundedRagService:
         if retrieval_limit <= 0:
             raise ValueError("retrieval_limit must be positive")
 
-        resolution = self._tax_year_resolver.resolve(question)
+        resolution = self._tax_year_resolver.resolve(
+            question, self._tax_year_context_provider(question)
+        )
         if resolution.source is TaxYearResolutionSource.AMBIGUOUS:
             years = ", ".join(str(year) for year in resolution.mentioned_years)
             return GroundedRagResult(
@@ -121,6 +132,11 @@ class GroundedRagService:
         ):
             raise TemporalResolutionError(
                 f"Requested tax year {tax_year} conflicts with query year {resolution.tax_year}"
+            )
+        if resolution.needs_clarification and tax_year is None:
+            return GroundedRagResult(
+                status=GroundedRagStatus.CLARIFICATION_REQUIRED,
+                clarification_questions=("Which tax year does your question concern?",),
             )
         resolved_year = tax_year if tax_year is not None else resolution.tax_year
         decision = self._router.route(question, tax_year=resolved_year)

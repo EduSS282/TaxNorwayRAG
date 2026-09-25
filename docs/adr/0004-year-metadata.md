@@ -17,6 +17,9 @@ cannot establish temporal applicability.
   temporal metadata into its chunk payload.
 - `TaxYearResolver` applies explicit query year, conversation context, identified form, and current
   applicable year in that order. Multiple explicit years are ambiguous.
+- `GroundedRagService` receives conversation/form/current-year hints through an injected context
+  provider. With no resolved year, a caller may mark the year as required to force clarification
+  before retrieval; the default provider is empty and does not persist conversation state.
 - `TaxYearAwareRetriever` applies the resolved year before ranking and rejects any adapter result
   whose year is missing or different.
 
