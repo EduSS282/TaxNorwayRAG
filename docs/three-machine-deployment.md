@@ -7,8 +7,9 @@ hardware disponible:
 - portátil: Intel i7-13700H y 16 GB de RAM DDR5;
 - Oracle Free Tier: 2 OCPU y 12 GB de RAM.
 
-La recomendación no presupone una API web todavía. El punto de entrada implementado es la CLI
-`taxguide`; Qdrant, Ollama y llama.cpp son procesos externos que TaxGuide consume por HTTP.
+La CLI `taxguide` y la API FastAPI de consulta son puntos de entrada implementados. La API carece
+de autenticación: úsala en loopback o tras una pasarela privada autenticada. Qdrant, Ollama y
+llama.cpp son procesos externos que TaxGuide consume por HTTP.
 
 ## Decisión recomendada
 
@@ -18,7 +19,7 @@ responder preguntas locales.
 
 | Máquina | Responsabilidad recomendada | Procesos |
 | --- | --- | --- |
-| Sobremesa | Orquestación y respuesta interactiva | TaxGuide CLI, Qdrant, embeddings y generador |
+| Sobremesa | Orquestación y respuesta interactiva | TaxGuide CLI/API, Qdrant, embeddings y generador |
 | Portátil | Desarrollo, pruebas y reranking opcional | repositorio, pytest/Ruff/mypy, llama.cpp reranker en CPU |
 | Oracle VM | Trabajo persistente no interactivo | crawling programado, informes, sincronización y copias |
 
@@ -318,7 +319,7 @@ no es posible comparar de forma fiable un cambio de modelo o de máquina.
 
 - TaxGuide no inicia ni supervisa Qdrant, Ollama, llama.cpp o los túneles SSH.
 - No existe failover automático entre sobremesa, portátil y Oracle.
-- No existe todavía una API HTTP de consulta ni una interfaz web implementada.
+- Existe una API HTTP de consulta, pero no autenticación integrada ni interfaz web.
 - El cache de embeddings es local al proceso, no persistente y no está compuesto por la factory.
 - No hay un benchmark real de corpus/generación con umbrales de release comprometido al repositorio.
 - El servicio remoto de reranking no tiene autenticación propia.

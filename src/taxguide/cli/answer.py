@@ -7,13 +7,10 @@ import typer
 
 from taxguide.config.loader import load_config
 from taxguide.config.models import AppConfig
-from taxguide.context.builder import ContextBuilder
 from taxguide.domain.exceptions import TaxguideError
-from taxguide.generation.factory import create_generator
-from taxguide.generation.service import GroundedRagResult, GroundedRagService, GroundedRagStatus
-from taxguide.retrieval.factory import RetrievalMode, create_retriever
-from taxguide.retrieval.temporal import TaxYearAwareRetriever
-from taxguide.rules.factory import create_tax_router
+from taxguide.generation.composition import build_grounded_service
+from taxguide.generation.service import GroundedRagResult, GroundedRagStatus
+from taxguide.retrieval.factory import RetrievalMode
 
 
 def _settings(config: Path | None, overlay: Path | None) -> AppConfig:
@@ -21,35 +18,6 @@ def _settings(config: Path | None, overlay: Path | None) -> AppConfig:
     if config or base.exists():
         return load_config(base, overlay)
     return load_config(overlay) if overlay is not None else AppConfig()
-
-
-def build_grounded_service(
-    settings: AppConfig,
-    *,
-    mode: RetrievalMode,
-    qdrant_url: str | None = None,
-    collection: str | None = None,
-    candidate_limit: int | None = None,
-) -> GroundedRagService:
-    """Compose the default application service while preserving injectable inner contracts."""
-    retriever = create_retriever(
-        settings,
-        mode=mode,
-        qdrant_url=qdrant_url,
-        collection=collection,
-        candidate_limit=candidate_limit,
-    )
-    return GroundedRagService(
-        router=create_tax_router(),
-        retriever=TaxYearAwareRetriever(retriever),
-        context_builder=ContextBuilder(
-            max_tokens=settings.generation.evidence_max_tokens,
-            max_chunks_per_document=settings.generation.max_chunks_per_document,
-        ),
-        generator=create_generator(settings.generation),
-        temperature=settings.generation.temperature,
-        max_tokens=settings.generation.max_tokens,
-    )
 
 
 def answer(

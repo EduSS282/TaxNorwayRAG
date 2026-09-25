@@ -1,6 +1,7 @@
 """End-to-end orchestration for evidence-bound tax answers."""
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from enum import StrEnum
 from typing import Self
 
@@ -84,6 +85,7 @@ class GroundedRagService:
         tax_year_resolver: TaxYearResolver | None = None,
         tax_year_context_provider: Callable[[str], TaxYearResolutionContext] | None = None,
         citation_validator: CitationValidator | None = None,
+        stage_timer: Callable[[str], AbstractContextManager[None]] | None = None,
     ) -> None:
         if not 0 <= temperature <= 2:
             raise ValueError("temperature must be between 0 and 2")
@@ -100,6 +102,7 @@ class GroundedRagService:
             lambda _question: TaxYearResolutionContext()
         )
         self._citation_validator = citation_validator or CitationValidator()
+        self._stage_timer = stage_timer or (lambda _stage: nullcontext())
 
     def answer(
         self,
@@ -160,14 +163,15 @@ class GroundedRagService:
 
         filters = RetrievalFilter(tax_year=resolved_year) if resolved_year is not None else None
         try:
-            if filters is None:
-                results = self._retriever.retrieve(question, limit=retrieval_limit)
-            else:
-                results = self._retriever.retrieve(
-                    question,
-                    limit=retrieval_limit,
-                    filters=filters,
-                )
+            with self._stage_timer("retrieval"):
+                if filters is None:
+                    results = self._retriever.retrieve(question, limit=retrieval_limit)
+                else:
+                    results = self._retriever.retrieve(
+                        question,
+                        limit=retrieval_limit,
+                        filters=filters,
+                    )
         except (TaxguideError, RuntimeError) as error:
             return self._failed(decision, f"retrieval failed: {error}")
 
@@ -230,11 +234,12 @@ class GroundedRagService:
     ) -> str | GroundedRagResult:
         messages = build_grounded_messages(question, context, tax_year=tax_year)
         try:
-            return self._generator.generate(
-                messages,
-                temperature=self._temperature,
-                max_tokens=self._max_tokens,
-            )
+            with self._stage_timer("generation"):
+                return self._generator.generate(
+                    messages,
+                    temperature=self._temperature,
+                    max_tokens=self._max_tokens,
+                )
         except RuntimeError as error:
             return self._failed(
                 decision,

@@ -5,9 +5,8 @@ official Norwegian tax documentation. The repository currently implements the of
 pipeline, four retrieval modes, tax-year-aware filtering, deterministic tax routing, and the
 contracts used by grounded generation.
 
-It now provides an end-to-end `taxguide answer` command that composes deterministic routing,
-tax-year resolution, retrieval, bounded context, local generation, validation, and safe abstention.
-An HTTP API and frontend are not implemented.
+It provides an end-to-end `taxguide answer` command and a FastAPI HTTP boundary over the same
+retrieval, reranking, and grounded-answer services. A frontend is not implemented.
 
 ## Implemented today
 
@@ -28,6 +27,7 @@ An HTTP API and frontend are not implemented.
 - bounded generation context, OpenAI-compatible local generation, Pydantic JSON parsing, citation,
   quote-span and tax-year validation, explicit application statuses, and safe abstention;
 - unit/integration evaluation utilities and an opt-in live retrieval benchmark harness.
+- FastAPI retrieval, reranking, query, health/version, and process-local observability endpoints.
 
 See [current architecture](docs/architecture.md) for component boundaries and
 [grounded-generation status](docs/generation.md) for the remaining end-to-end work.
@@ -90,6 +90,15 @@ uv run taxguide answer "Where do I report foreign income?" --tax-year 2025 --mod
 
 `answer` returns one of `answered`, `clarification_required`, `abstained`, or `failed`. It does not
 emit an unvalidated model answer.
+
+With the same external services running, start the loopback-only API:
+
+```bash
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+```
+
+See [HTTP API and observability](docs/api.md) for requests, configuration, tracing, metrics, and
+security boundaries. Do not expose the unauthenticated API to the public Internet.
 
 The CLI also supports direct local-file ingestion and chunk inspection:
 
@@ -169,6 +178,8 @@ available under the host/path policy in `configs/base.yaml`. See [crawler](docs/
   no committed production-quality corpus, results, thresholds, or hardware manifest.
 - The crawler does not execute JavaScript, submit forms, enter authenticated areas, or traverse
   interactive wizard branches.
+- The API has no authentication, rate limiting, distributed tracing exporter, or dependency
+  readiness probe; bind it to loopback or put it behind an authenticated private gateway.
 - TaxGuide provides information from official evidence; it is not a substitute for professional
   tax advice or an eligibility determination.
 

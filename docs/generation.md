@@ -146,4 +146,5 @@ connectivity/orchestration smoke check, not a quality benchmark.
   filtering to avoid false-empty retrieval.
 - The embedding cache is process-local, not integrated by the factory, and not persistent.
 - No reproducible real-corpus retrieval/generation baseline or release threshold is committed.
-- There is no authenticated HTTP API, frontend, model-process supervision, or automatic fallback.
+- The HTTP API exposes the same grounded service at `/v1/query`, but has no authentication,
+  frontend, model-process supervision, or automatic fallback; use loopback or a private gateway.

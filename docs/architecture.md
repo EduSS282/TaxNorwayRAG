@@ -20,7 +20,10 @@ taxguide retrieve → ranked chunks
 taxguide answer   → validated answer, clarification, abstention, or failure
 ```
 
-There is no HTTP API or frontend. External model and vector processes remain operator-managed.
+The FastAPI boundary exposes retrieval, reranking, and grounded answers through separate endpoints.
+It composes existing application services and adds request-scoped trace IDs, JSON access logs, and
+process-local latency metrics. It does not start external services or load model weights at import.
+There is no frontend or authenticated public deployment. See [API](api.md) and ADR 0009.
 
 ## Offline pipeline
 
@@ -186,7 +189,7 @@ The grounded CLI milestone is complete, but these gaps remain:
 3. count complete rendered prompt tokens rather than only chunk tokens;
 4. add a copied quote or claim mapping if exact semantic quote validation is required;
 5. enrich corpus topic/audience metadata before applying every router filter to retrieval;
-6. add authenticated HTTP/API deployment, observability, and service supervision;
+6. add authenticated public API deployment, distributed telemetry export, and service supervision;
 7. execute and record the existing opt-in live smoke test on the target hardware and corpus.
 8. add safe candidate collection cleanup and richer immutable evaluation provenance (model/runtime
    revisions and hardware manifest).

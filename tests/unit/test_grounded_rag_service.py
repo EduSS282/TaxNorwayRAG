@@ -1,6 +1,7 @@
 """End-to-end tests for deterministic grounded-generation orchestration."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 
 import pytest
@@ -80,6 +81,29 @@ def test_service_returns_a_validated_grounded_answer() -> None:
         )
     ]
     assert "untrusted quoted data" in generator.calls[0][0]["content"]
+
+
+def test_service_records_retrieval_and_generation_stages() -> None:
+    chunk = _chunk("a", tax_year=2026)
+    recorded: list[str] = []
+
+    @contextmanager
+    def timer(stage: str) -> Iterator[None]:
+        recorded.append(stage)
+        yield
+
+    service = GroundedRagService(
+        router=create_tax_router(),
+        retriever=RecordingRetriever([ScoredChunk(chunk=chunk, score=0.9)]),
+        context_builder=ContextBuilder(max_tokens=100, max_chunks_per_document=2),
+        generator=StubGenerator(_answer(chunk, tax_year=2026).model_dump_json()),
+        temperature=0.1,
+        max_tokens=100,
+        stage_timer=timer,
+    )
+    result = service.answer("Explain Norwegian wealth tax for 2026.")
+    assert result.status is GroundedRagStatus.ANSWERED
+    assert recorded == ["retrieval", "generation"]
 
 
 def test_service_requests_clarification_before_runtime_calls() -> None:
