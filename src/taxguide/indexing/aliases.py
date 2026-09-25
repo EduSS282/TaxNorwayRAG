@@ -26,6 +26,7 @@ class QdrantIndexAliases:
         candidate: str,
         alias: str = "taxguide_current",
         previous_alias: str = "taxguide_previous",
+        initial_collection: str | None = None,
     ) -> str | None:
         """Point `alias` at a reviewed physical candidate and retain the former target."""
         self._validate_names(candidate, alias, previous_alias)
@@ -35,12 +36,23 @@ class QdrantIndexAliases:
             aliases = self._aliases()
             current_collection = aliases.get(alias)
             previous_collection = aliases.get(previous_alias)
+            if current_collection is None and previous_collection is not None:
+                raise VectorStoreError(
+                    "Previous alias exists without an active alias; repair aliases before promotion"
+                )
             if candidate in {alias, previous_alias}:
                 raise VectorStoreError("Candidate collection must use a physical collection name")
             if current_collection == candidate:
                 raise VectorStoreError(f"Candidate {candidate!r} is already the active index")
             if previous_collection == candidate:
                 raise VectorStoreError("Candidate is already the rollback target")
+            if current_collection is None and initial_collection is not None:
+                if initial_collection in {alias, previous_alias}:
+                    raise VectorStoreError("Initial collection must use a physical collection name")
+                if initial_collection != candidate and self._client.collection_exists(
+                    initial_collection
+                ):
+                    current_collection = initial_collection
 
             from qdrant_client.models import (
                 CreateAlias,
@@ -52,7 +64,7 @@ class QdrantIndexAliases:
             )
 
             operations: list[Any] = []
-            if current_collection is not None:
+            if alias in aliases:
                 if previous_collection is not None:
                     operations.append(
                         DeleteAliasOperation(delete_alias=DeleteAlias(alias_name=previous_alias))
@@ -61,6 +73,18 @@ class QdrantIndexAliases:
                     RenameAliasOperation(
                         rename_alias=RenameAlias(
                             old_alias_name=alias, new_alias_name=previous_alias
+                        )
+                    )
+                )
+            elif current_collection is not None:
+                if previous_collection is not None:
+                    operations.append(
+                        DeleteAliasOperation(delete_alias=DeleteAlias(alias_name=previous_alias))
+                    )
+                operations.append(
+                    CreateAliasOperation(
+                        create_alias=CreateAlias(
+                            collection_name=current_collection, alias_name=previous_alias
                         )
                     )
                 )

@@ -14,9 +14,14 @@ uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --in
 ```
 
 The command creates and validates a single-vector cosine collection. Re-running against the same
-candidate skips document versions already present. A changed source hash creates a new version;
-the old points are retained. Candidates must be evaluated using the same embedder and compatible
-collection schema as production.
+candidate skips embedding only when the exact chunk IDs, content hashes, and parse/chunk/embed
+settings signature match. A changed source hash creates a new version. Once all new point writes
+complete, the builder removes obsolete points for that document; dense and sparse readers of that
+collection then see only the current version. An interrupted write can temporarily expose a mix
+of versions until the next successful build, so production readers should use the active alias and
+build candidates separately. The signature does not capture immutable upstream model weights or
+library revisions; use a fresh candidate if those change. Candidates must use a compatible
+collection schema and be evaluated with the intended embedder.
 
 ## 2. Evaluate the candidate
 
@@ -48,7 +53,12 @@ The explicit `--evaluation-passed` flag records the operator's review decision. 
 metrics to thresholds, because none are defined. By default, `taxguide_current` points at the new
 collection and `taxguide_previous` retains the former active collection. Retrieval continues to
 use the collection configured by the application; configure that setting to `taxguide_current` to
-read through the alias.
+read through the alias. On first promotion, if no current alias exists and the configured
+`corpus.qdrant_collection` is an existing physical collection distinct from the candidate, it is
+adopted as `taxguide_previous` in the same alias update. This preserves one-step rollback from a
+pre-alias deployment. If that collection does not exist, there is no prior index to roll back to.
+After promotion, set reader configuration to `taxguide_current`; keep a separate physical target
+for candidate builds.
 
 ## 4. Roll back
 
@@ -67,7 +77,8 @@ operators must ensure sufficient storage and remove obsolete collections deliber
 
 - This lifecycle changes Qdrant aliases only; it does not deploy models or restart application
   processes.
-- Sparse retrieval currently loads payloads from a collection and needs no separate index alias.
+- Sparse retrieval loads payloads from the configured collection, so it follows the alias when
+  configured to use `taxguide_current`; in-process lexical snapshots need refreshing after a swap.
 - Evaluation artifacts bind results to collection and dataset version but do not yet capture
   immutable model revisions, runtime versions, or hardware details.
 - The benchmark is exploratory until a representative gold set and reviewed thresholds are

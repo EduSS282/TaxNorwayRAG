@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from qdrant_client import QdrantClient
 
 from taxguide.domain.enums import TaxTopic
 from taxguide.domain.exceptions import VectorStoreError
@@ -41,23 +42,12 @@ class FakeQdrantClient:
         )
         return SimpleNamespace(config=SimpleNamespace(params=SimpleNamespace(vectors=vectors)))
 
-    def upsert(self, *, collection_name: str, points: list[dict[str, Any]]) -> None:
+    def upsert(self, *, collection_name: str, points: list[Any], wait: bool = True) -> None:
         assert collection_name == "taxguide_chunks"
-        self.points = points
-        self.upsert_calls.append(points)
-
-    def count(
-        self, *, collection_name: str, count_filter: Any | None = None, exact: bool = True
-    ) -> object:
-        assert collection_name == "taxguide_chunks"
-        assert exact is True
-        count = sum(
-            point["payload"]["document_id"] == count_filter.must[0].match.value
-            and point["payload"]["metadata"]["version_id"] == count_filter.must[1].match.value
-            for batch in self.upsert_calls
-            for point in batch
-        )
-        return SimpleNamespace(count=count)
+        assert wait is True
+        normalized = [point.model_dump() for point in points]
+        self.points = normalized
+        self.upsert_calls.append(normalized)
 
     def query_points(
         self, *, collection_name: str, query: list[float], limit: int, with_payload: bool
@@ -243,28 +233,50 @@ def test_repeated_upserts_target_the_same_deterministic_point() -> None:
 
 
 def test_qdrant_checks_for_an_existing_document_version() -> None:
-    client = FakeQdrantClient()
-    store = QdrantVectorStore(client)
+    client = QdrantClient(":memory:")
+    store = QdrantVectorStore(client, index_signature="model-and-chunker-a")
+    store.ensure_collection(2)
     chunk = _chunk()
     chunk = chunk.model_copy(
         update={"metadata": chunk.metadata.model_copy(update={"version_id": "f" * 64})}
     )
 
     assert not store.has_document_version(
-        document_id=chunk.document_id, version_id="e" * 64, expected_chunks=1
+        document_id=chunk.document_id, version_id="e" * 64, expected_chunks=[chunk]
     )
     store.upsert([chunk], [(0.1, 0.2)])
 
     assert store.has_document_version(
         document_id=chunk.document_id,
         version_id=chunk.metadata.version_id or "",
-        expected_chunks=1,
+        expected_chunks=[chunk],
     )
+    changed_content = chunk.model_copy(update={"content_hash": "e" * 64})
     assert not store.has_document_version(
         document_id=chunk.document_id,
         version_id=chunk.metadata.version_id or "",
-        expected_chunks=2,
+        expected_chunks=[changed_content],
     )
+    assert not QdrantVectorStore(
+        client, index_signature="model-and-chunker-b"
+    ).has_document_version(
+        document_id=chunk.document_id,
+        version_id=chunk.metadata.version_id or "",
+        expected_chunks=[chunk],
+    )
+
+
+def test_qdrant_prunes_obsolete_versions_and_old_chunk_ids() -> None:
+    client = QdrantClient(":memory:")
+    store = QdrantVectorStore(client, index_signature="test-index")
+    store.ensure_collection(2)
+    old = _chunk()
+    current = old.model_copy(update={"id": "e" * 64, "content_hash": "f" * 64})
+    store.upsert([old, current], [(0.1, 0.2), (0.2, 0.1)])
+
+    store.prune_document_points(document_id=old.document_id, keep_chunk_ids=[current.id])
+
+    assert [chunk.id for chunk in store.load_chunks()] == [current.id]
 
 
 def test_qdrant_http_errors_include_status_and_response_body() -> None:
@@ -273,7 +285,7 @@ def test_qdrant_http_errors_include_status_and_response_body() -> None:
         content = b'{"status":{"error":"invalid point id"}}'
 
     class RejectedClient(FakeQdrantClient):
-        def upsert(self, *, collection_name: str, points: list[dict[str, Any]]) -> None:
+        def upsert(self, *, collection_name: str, points: list[Any], wait: bool = True) -> None:
             raise RejectedRequest("bad request")
 
     with pytest.raises(VectorStoreError, match="status 400: .*invalid point id"):

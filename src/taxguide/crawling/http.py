@@ -23,7 +23,9 @@ class HttpResponse:
 
 
 class HttpFetcher(Protocol):
-    def fetch(self, url: str) -> HttpResponse: ...
+    def fetch(
+        self, url: str, *, before_request: Callable[[str], None] | None = None
+    ) -> HttpResponse: ...
 
 
 class SafeHttpClient:
@@ -62,11 +64,15 @@ class SafeHttpClient:
     def close(self) -> None:
         self.client.close()
 
-    def fetch(self, url: str) -> HttpResponse:
+    def fetch(
+        self, url: str, *, before_request: Callable[[str], None] | None = None
+    ) -> HttpResponse:
         current = url
         redirects = 0
         while True:
             self.target_validator(current)
+            if before_request is not None:
+                before_request(current)
             response = self._request_with_retries(current)
             if response.status_code not in REDIRECT_STATUSES:
                 return response

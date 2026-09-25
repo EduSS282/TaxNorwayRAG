@@ -1,7 +1,7 @@
 """Qdrant implementation of the vector-store contract."""
 
 from typing import Any, Protocol, cast
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from taxguide.domain.exceptions import VectorStoreError
 from taxguide.domain.models import Chunk
@@ -17,11 +17,9 @@ class QdrantClient(Protocol):
 
     def get_collection(self, collection_name: str) -> Any: ...
 
-    def upsert(self, *, collection_name: str, points: list[dict[str, Any]]) -> None: ...
+    def upsert(self, *, collection_name: str, points: list[Any], wait: bool = True) -> Any: ...
 
-    def count(
-        self, *, collection_name: str, count_filter: Any | None = None, exact: bool = True
-    ) -> Any: ...
+    def delete(self, *, collection_name: str, points_selector: Any, wait: bool = True) -> Any: ...
 
     def query_points(
         self,
@@ -43,6 +41,7 @@ class QdrantScrollClient(Protocol):
         with_payload: bool,
         with_vectors: bool,
         offset: Any | None = None,
+        scroll_filter: Any | None = None,
     ) -> Any: ...
 
 
@@ -57,9 +56,16 @@ def qdrant_point_id(chunk_id: str) -> str:
 class QdrantVectorStore:
     """Store chunks in Qdrant with stable UUID point IDs."""
 
-    def __init__(self, client: QdrantClient, *, collection_name: str = "taxguide_chunks") -> None:
+    def __init__(
+        self,
+        client: QdrantClient,
+        *,
+        collection_name: str = "taxguide_chunks",
+        index_signature: str | None = None,
+    ) -> None:
         self._client = client
         self._collection_name = collection_name
+        self._index_signature = index_signature
 
     def ensure_collection(self, vector_size: int) -> None:
         """Create a missing cosine collection and reject an incompatible existing schema."""
@@ -109,26 +115,26 @@ class QdrantVectorStore:
     def upsert(self, chunks: list[Chunk], embeddings: EmbeddingBatch) -> None:
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must have the same length")
+        from qdrant_client.models import PointStruct
+
         points = [
-            {
-                "id": qdrant_point_id(chunk.id),
-                "vector": list(embedding),
-                "payload": _chunk_payload(chunk),
-            }
+            PointStruct(
+                id=qdrant_point_id(chunk.id),
+                vector=list(embedding),
+                payload=_chunk_payload(chunk, self._index_signature),
+            )
             for chunk, embedding in zip(chunks, embeddings, strict=True)
         ]
         if points:
             try:
-                self._client.upsert(collection_name=self._collection_name, points=points)
+                self._client.upsert(collection_name=self._collection_name, points=points, wait=True)
             except Exception as exc:
                 raise _qdrant_error(exc) from exc
 
     def has_document_version(
-        self, *, document_id: str, version_id: str, expected_chunks: int
+        self, *, document_id: str, version_id: str, expected_chunks: list[Chunk]
     ) -> bool:
-        """Check that every expected chunk for this source version is indexed."""
-        if expected_chunks < 0:
-            raise ValueError("expected_chunks must be non-negative")
+        """Compare chunk identities, content hashes, and indexing configuration."""
         from qdrant_client.models import FieldCondition, Filter, MatchValue
 
         query_filter = Filter(
@@ -138,15 +144,62 @@ class QdrantVectorStore:
             ]
         )
         try:
-            count = cast(
-                int,
-                self._client.count(
+            found: dict[str, dict[str, Any]] = {}
+            offset: Any | None = None
+            while True:
+                records, next_offset = cast(QdrantScrollClient, self._client).scroll(
                     collection_name=self._collection_name,
-                    count_filter=query_filter,
-                    exact=True,
-                ).count,
+                    scroll_filter=query_filter,
+                    limit=256,
+                    with_payload=True,
+                    with_vectors=False,
+                    offset=offset,
+                )
+                for record in records:
+                    payload = record.payload
+                    if not isinstance(payload, dict) or not isinstance(
+                        payload.get("chunk_id"), str
+                    ):
+                        return False
+                    if str(record.id) != qdrant_point_id(payload["chunk_id"]):
+                        return False
+                    found[payload["chunk_id"]] = payload
+                if next_offset is None:
+                    break
+                offset = next_offset
+            expected = {chunk.id: chunk.content_hash for chunk in expected_chunks}
+            return len(found) == len(expected) and all(
+                chunk_id in found
+                and found[chunk_id].get("content_hash") == content_hash
+                and found[chunk_id].get("_index_signature") == self._index_signature
+                for chunk_id, content_hash in expected.items()
             )
-            return count == expected_chunks
+        except Exception as exc:
+            raise _qdrant_error(exc) from exc
+
+    def prune_document_points(self, *, document_id: str, keep_chunk_ids: list[str]) -> None:
+        """Retire obsolete versions and chunks after the current document is complete."""
+        from qdrant_client.models import (
+            FieldCondition,
+            Filter,
+            FilterSelector,
+            HasIdCondition,
+            MatchValue,
+        )
+
+        keep_ids: list[int | str | UUID] = [
+            qdrant_point_id(chunk_id) for chunk_id in keep_chunk_ids
+        ]
+        query_filter = Filter(
+            must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))],
+            must_not=[HasIdCondition(has_id=keep_ids)] if keep_ids else None,
+        )
+        try:
+            self._client.delete(
+                collection_name=self._collection_name,
+                points_selector=FilterSelector(filter=query_filter),
+                wait=True,
+            )
         except Exception as exc:
             raise _qdrant_error(exc) from exc
 
@@ -201,8 +254,12 @@ class QdrantVectorStore:
             raise _qdrant_error(exc) from exc
 
 
-def _chunk_payload(chunk: Chunk) -> dict[str, Any]:
-    return {**chunk.model_dump(mode="json"), "chunk_id": chunk.id}
+def _chunk_payload(chunk: Chunk, index_signature: str | None) -> dict[str, Any]:
+    return {
+        **chunk.model_dump(mode="json"),
+        "chunk_id": chunk.id,
+        "_index_signature": index_signature,
+    }
 
 
 def _qdrant_filter(filters: RetrievalFilter | None) -> Any | None:
@@ -230,7 +287,9 @@ def _qdrant_filter(filters: RetrievalFilter | None) -> Any | None:
 def _chunk_from_payload(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise VectorStoreError("Qdrant returned a point without a payload object")
-    return {key: value for key, value in payload.items() if key != "chunk_id"}
+    return {
+        key: value for key, value in payload.items() if key not in {"chunk_id", "_index_signature"}
+    }
 
 
 def _collection_vector_config(info: Any) -> tuple[int, str]:

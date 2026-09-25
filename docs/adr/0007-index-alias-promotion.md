@@ -15,15 +15,16 @@ source content.
 
 - Index candidate corpora into a separate physical collection selected by the corpus CLI.
 - Identify an indexed source version by `document_id` and deterministic `version_id`; parse and
-  chunk deterministically, then skip embedding only when the expected number of chunks exists in
-  the target collection. Partial earlier writes are therefore retried.
+  chunk deterministically, then skip embedding only when exact chunk IDs, content hashes, and
+  the index-settings signature match. Partial earlier writes are therefore retried.
 - Record source changes in crawl manifests by comparing the content hash with the previously saved
   manifest for that document.
 - Persist live retrieval metrics as an artifact bound to candidate collection and dataset version.
 - Require all four retrieval modes in the report and an explicit operator `--evaluation-passed`
   flag before promoting.
 - Use Qdrant's atomic alias operations to point the stable current alias to a candidate while
-  retaining one prior collection for rollback.
+  retaining one prior collection for rollback. The first promotion adopts the configured existing
+  physical collection as the previous target when no current alias exists.
 - Never delete collections automatically during promotion or rollback.
 
 ## Consequences

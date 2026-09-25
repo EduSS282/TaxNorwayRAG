@@ -18,6 +18,7 @@ from taxguide.domain.enums import PageType
 from taxguide.domain.exceptions import CorpusError, TaxguideError
 from taxguide.embeddings.base import Embedder
 from taxguide.embeddings.factory import create_embedder
+from taxguide.indexing.signature import index_signature
 from taxguide.ingestion.normalizer import Normalizer
 from taxguide.ingestion.pipeline import IngestionPipeline
 from taxguide.ingestion.skatteetaten_parser import SkatteetatenHtmlParser
@@ -59,6 +60,7 @@ def _indexing(settings: AppConfig, collection: str | None = None) -> tuple[Embed
     store = QdrantVectorStore(
         cast(QdrantClientProtocol, QdrantClient(url=settings.corpus.qdrant_url)),
         collection_name=collection or settings.corpus.qdrant_collection,
+        index_signature=index_signature(settings, embedder.model_id),
     )
     store.ensure_collection(embedder.dimension)
     return embedder, cast(VectorStore, store)

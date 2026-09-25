@@ -1,11 +1,13 @@
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 
+import httpx
 import pytest
 
-from taxguide.crawling.http import HttpResponse
+from taxguide.crawling.http import HttpResponse, SafeHttpClient
 from taxguide.crawling.models import CrawlRequest, SourceChangeStatus
 from taxguide.crawling.skatteetaten import SkatteetatenCrawler
 from taxguide.crawling.storage import FileCrawlArtifactRepository
@@ -23,7 +25,11 @@ class FakeHttp:
         self.responses = responses
         self.requested: list[str] = []
 
-    def fetch(self, url: str) -> HttpResponse:
+    def fetch(
+        self, url: str, *, before_request: Callable[[str], None] | None = None
+    ) -> HttpResponse:
+        if before_request is not None:
+            before_request(url)
         self.requested.append(url)
         return self.responses[url]
 
@@ -45,6 +51,73 @@ def test_external_seed_is_rejected() -> None:
     crawler = SkatteetatenCrawler(FakeHttp({}))
     with pytest.raises(DisallowedDomainError):
         crawler.crawl(CrawlRequest(url="https://example.com/"))
+
+
+@pytest.mark.parametrize(
+    ("redirect_path", "robots_body", "expected_category"),
+    [
+        ("/outside", "User-agent: *\nAllow: /", "DisallowedDomainError"),
+        ("/allowed/private", "User-agent: *\nDisallow: /allowed/private", "skipped"),
+    ],
+)
+def test_redirect_target_is_checked_before_http_request(
+    tmp_path: Path, redirect_path: str, robots_body: str, expected_category: str
+) -> None:
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request.url.path)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text=robots_body)
+        if request.url.path == "/allowed/start":
+            return httpx.Response(302, headers={"location": redirect_path})
+        return httpx.Response(
+            200, text="<html><main>Content</main></html>", headers={"content-type": "text/html"}
+        )
+
+    client = SafeHttpClient(
+        user_agent="crawler-test",
+        connect_timeout=1,
+        read_timeout=1,
+        max_retries=0,
+        request_delay=0,
+        max_response_bytes=1000,
+        target_validator=lambda url: None,
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = SkatteetatenCrawler(
+            client,
+            FileCrawlArtifactRepository(tmp_path),
+            allowed_path_prefixes=("/allowed",),
+            user_agent="crawler-test",
+        ).crawl(CrawlRequest(url=f"{BASE}/allowed/start", max_pages=1))
+    finally:
+        client.close()
+    assert redirect_path not in requested
+    if expected_category == "skipped":
+        assert result.skipped == 1
+    else:
+        assert result.failures[0].error_category == expected_category
+
+
+def test_named_source_skips_detected_language_outside_policy(tmp_path: Path) -> None:
+    url = f"{BASE}/allowed"
+    http = FakeHttp(
+        {
+            f"{BASE}/robots.txt": robots(),
+            url: response(url, '<html lang="nb"><main>Skatt</main></html>'),
+        }
+    )
+    result = SkatteetatenCrawler(
+        http,
+        FileCrawlArtifactRepository(tmp_path),
+        allowed_languages=("en",),
+        source_id="english",
+    ).crawl(CrawlRequest(url=url, max_pages=1))
+    assert result.fetched == 0
+    assert result.skipped == 1
+    assert not list((tmp_path / "manifests" / "crawl").glob("*.json"))
 
 
 def test_robots_allow_and_disallow_are_cached(tmp_path: Path) -> None:

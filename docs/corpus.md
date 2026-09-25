@@ -32,10 +32,10 @@ uv run taxguide corpus build --url-prefix "/en/person/taxes/" --exclude-wizards 
 Indexing requires the configured embedding service and Qdrant. The command creates a missing
 single-vector cosine collection using the embedder's reported dimension and validates an existing
 collection before upsert; see [local Qdrant](qdrant-local.md). Repeated indexed builds parse and
-chunk the source, then check that the selected collection contains the expected number of chunks
-for `document_id + version_id` before embedding. This avoids re-embedding a complete indexed
-version, detects partial earlier writes, and does not reuse vectors across collections or provide a
-persistent embedding cache.
+chunk the source, then compare exact chunk IDs, content hashes, and the parse/chunk/embed settings
+signature for `document_id + version_id`. This avoids re-embedding a complete matching version,
+detects partial earlier writes, and does not reuse vectors across collections or provide a
+persistent embedding cache. A successful write retires other points for the same document.
 
 To build a separate physical candidate without replacing the configured production collection:
 
@@ -44,8 +44,9 @@ uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --in
 ```
 
 Use a new candidate collection name for each evaluation cycle. Indexing is incremental within that
-collection; a changed source version is indexed as a new version, while old points are retained.
-Candidate cleanup and garbage collection are intentionally not automated.
+collection; a changed source version replaces old points for the same document only after all new
+chunks are written. A failed in-place build can temporarily show both versions. Candidate
+collection cleanup and garbage collection are intentionally not automated.
 
 `--list` shows document ID, language, page type, and effective URL. `--json`
 provides the same selection data without HTML. Effective URL priority is an

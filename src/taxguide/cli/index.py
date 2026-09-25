@@ -65,6 +65,7 @@ def promote(
             candidate=candidate,
             alias=alias,
             previous_alias=previous_alias,
+            initial_collection=settings.corpus.qdrant_collection,
         )
     except (OSError, ValueError, TaxguideError, RuntimeError) as exc:
         typer.echo(f"Error: {exc}", err=True)

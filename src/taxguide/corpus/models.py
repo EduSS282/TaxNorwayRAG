@@ -13,6 +13,7 @@ class CorpusModel(BaseModel):
 
 
 class CrawlManifest(CorpusModel):
+    source_id: str | None = None
     document_id: Digest
     original_url: str
     final_url: str

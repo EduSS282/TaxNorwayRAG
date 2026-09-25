@@ -11,7 +11,8 @@ An HTTP API and frontend are not implemented.
 
 ## Implemented today
 
-- bounded crawling of public `skatteetaten.no` HTML, with manifests and duplicate detection;
+- bounded crawling of public `skatteetaten.no` HTML, with named source policies, capture
+  manifests, and duplicate detection;
 - domain/path-constrained crawling with robots and bounded `Retry-After` handling, plus source
   change detection across recrawls;
 - HTML parsing, normalization, and deterministic document/version identities;
@@ -22,8 +23,8 @@ An HTTP API and frontend are not implemented.
 - strict pre-ranking tax-year filters and cross-year result validation;
 - deterministic topic, intent, risk, and route classification;
 - automatic creation and schema validation of the Qdrant collection during indexed corpus builds;
-- incremental indexing that skips already indexed document versions, and candidate collection
-  promotion/rollback through stable Qdrant aliases;
+- incremental indexing that verifies chunk identities, content hashes, and index settings,
+  retires obsolete document points, and supports candidate promotion/rollback through Qdrant aliases;
 - bounded generation context, OpenAI-compatible local generation, Pydantic JSON parsing, citation,
   quote-span and tax-year validation, explicit application statuses, and safe abstention;
 - unit/integration evaluation utilities and an opt-in live retrieval benchmark harness.
@@ -66,7 +67,7 @@ reported dimension. Existing collections are validated before any upsert. Follow
 Acquire and inspect official pages:
 
 ```bash
-uv run taxguide crawl "https://www.skatteetaten.no/en/person/taxes/tax-return/" --max-pages 25 --max-depth 2
+uv run taxguide crawl --source skatteetaten-tax-return-en --max-pages 25 --max-depth 2
 uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --dry-run
 uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --index
 ```
@@ -148,6 +149,8 @@ Qdrant collection plus the configured model services. See [retrieval](docs/retri
 [grounded generation](docs/generation.md). No reproducible real-corpus baseline is committed yet.
 Candidate indexing, live evaluation artifacts, and reviewed alias promotion/rollback are described
 in [index lifecycle](docs/index-lifecycle.md).
+Named crawl scopes live in [configs/sources.yaml](configs/sources.yaml); URL-only crawls remain
+available under the host/path policy in `configs/base.yaml`. See [crawler](docs/crawler.md).
 
 ## Current limitations and next milestone
 

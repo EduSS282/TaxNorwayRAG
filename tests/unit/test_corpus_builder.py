@@ -73,19 +73,32 @@ def test_missing_raw_artifact_is_reported_without_aborting(tmp_path: Path) -> No
 class RecordingStore:
     def __init__(self) -> None:
         self.batches: list[list[Chunk]] = []
-        self.versions: dict[tuple[str, str | None], set[str]] = {}
+        self.versions: dict[tuple[str, str | None], dict[str, str]] = {}
 
     def has_document_version(
-        self, *, document_id: str, version_id: str, expected_chunks: int
+        self, *, document_id: str, version_id: str, expected_chunks: list[Chunk]
     ) -> bool:
-        return len(self.versions.get((document_id, version_id), set())) == expected_chunks
+        expected = {chunk.id: chunk.content_hash for chunk in expected_chunks}
+        return self.versions.get((document_id, version_id), {}) == expected
 
     def upsert(self, chunks: list[Chunk], embeddings: list[tuple[float, ...]]) -> None:
         assert len(chunks) == len(embeddings)
         self.batches.append(chunks)
         for chunk in chunks:
             key = (chunk.document_id, chunk.metadata.version_id)
-            self.versions.setdefault(key, set()).add(chunk.id)
+            self.versions.setdefault(key, {})[chunk.id] = chunk.content_hash
+
+    def prune_document_points(self, *, document_id: str, keep_chunk_ids: list[str]) -> None:
+        keep = set(keep_chunk_ids)
+        for key in list(self.versions):
+            if key[0] == document_id:
+                self.versions[key] = {
+                    chunk_id: content_hash
+                    for chunk_id, content_hash in self.versions[key].items()
+                    if chunk_id in keep
+                }
+                if not self.versions[key]:
+                    del self.versions[key]
 
     def search(self, query: tuple[float, ...], *, limit: int) -> list[object]:
         return []
@@ -148,6 +161,38 @@ def test_repeated_index_build_skips_an_already_indexed_source_version(tmp_path: 
     assert first.processed == 1 and first.unchanged == 0
     assert second.processed == 0 and second.unchanged == 1
     assert len(store.batches) == batches_after_first
+
+
+def test_changed_source_replaces_old_version_without_stale_points(tmp_path: Path) -> None:
+    first_html = "<html><main><h1>Tax</h1><p>Old guidance.</p></main></html>"
+    second_html = "<html><main><h1>Tax</h1><p>New guidance.</p></main></html>"
+    item = make_manifest("replacement")
+    raw = tmp_path / f"{item.document_id}.html"
+    store = RecordingStore()
+    builder = CorpusBuilder(
+        pipeline, StructuralChunker(), embedder=MockEmbedder(), vector_store=store
+    )
+
+    raw.write_text(first_html, encoding="utf-8")
+    first = builder.build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    old_ids = {chunk.id for batch in store.batches for chunk in batch}
+    raw.write_text(second_html, encoding="utf-8")
+    second = builder.build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    current_ids = {chunk.id for batch in store.batches[1:] for chunk in batch}
+
+    assert first.processed == second.processed == 1
+    assert old_ids.isdisjoint(current_ids)
+    assert {chunk_id for points in store.versions.values() for chunk_id in points} == current_ids
 
 
 def test_annual_versions_keep_distinct_identity_through_vector_indexing(tmp_path: Path) -> None:

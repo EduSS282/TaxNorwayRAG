@@ -101,8 +101,12 @@ class CorpusBuilder:
                     if self.vector_store.has_document_version(
                         document_id=manifest.document_id,
                         version_id=document.version_id,
-                        expected_chunks=len(chunks),
+                        expected_chunks=chunks,
                     ):
+                        self.vector_store.prune_document_points(
+                            document_id=manifest.document_id,
+                            keep_chunk_ids=[chunk.id for chunk in chunks],
+                        )
                         unchanged += 1
                         continue
                     for offset in range(0, len(chunks), self.embedding_batch_size):
@@ -110,6 +114,10 @@ class CorpusBuilder:
                         self.vector_store.upsert(
                             batch, self.embedder.embed_documents([chunk.text for chunk in batch])
                         )
+                    self.vector_store.prune_document_points(
+                        document_id=manifest.document_id,
+                        keep_chunk_ids=[chunk.id for chunk in chunks],
+                    )
                 except Exception as exc:
                     failures.append(self._failure(manifest, "index", exc))
                     continue

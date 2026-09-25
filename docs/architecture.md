@@ -37,8 +37,9 @@ Skatteetaten URL
   → QdrantVectorStore
 ```
 
-The crawler is bounded by host/path allowlists, robots rules, depth, page count, response size,
-retry policy, and delay. Raw HTML and its manifest are stored separately. Corpus selection uses
+The crawler is bounded by host/path allowlists, named source policies, robots rules checked before
+each content redirect hop, depth, page count, response size, retry policy, and delay. Named source
+policies are input YAML; raw HTML and per-page capture manifests are stored separately. Corpus selection uses
 manifests rather than filenames, excludes failed/non-HTML captures, and can exclude duplicate or
 interactive-wizard pages.
 
@@ -48,7 +49,8 @@ and temporal applicability where it is known.
 
 ## Identity and temporal data
 
-- `document_id` is derived from the canonical source URL.
+- `document_id` is derived from the normalized final fetched URL; HTML canonical metadata is
+  retained as provenance without merging distinct fetched aliases.
 - `version_id` is derived from `document_id + content_hash`.
 - chunk identity includes the document version, section path, and chunk index.
 - `tax_year`, `valid_from`, and `valid_to` remain independent optional facts; one is never inferred
@@ -59,8 +61,9 @@ The corpus builder can derive a tax year from an explicit version URL. Missing t
 stays missing. See ADR 0004 for the versioning decision.
 
 Crawler manifests record content-change status against the previous saved manifest. During
-indexing, the corpus builder checks for the exact document/version in its target collection and
-skips repeat embedding when all expected chunks are present. Physical candidate collections can be
+indexing, the corpus builder checks exact chunk IDs/content hashes and an index-settings signature,
+skipping repeat embedding only when all match. Obsolete points for a document are removed after a
+complete current-version write. Physical candidate collections can be
 evaluated and promoted through stable Qdrant aliases, with one previous collection retained for rollback; see
 [index lifecycle](index-lifecycle.md) and ADR 0007.
 

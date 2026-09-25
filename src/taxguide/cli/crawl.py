@@ -9,13 +9,18 @@ from taxguide.config.models import AppConfig
 from taxguide.crawling.http import SafeHttpClient
 from taxguide.crawling.models import CrawlRequest
 from taxguide.crawling.skatteetaten import SkatteetatenCrawler
+from taxguide.crawling.sources import load_source_manifest
 from taxguide.crawling.storage import FileCrawlArtifactRepository
 from taxguide.crawling.urls import validate_target
 from taxguide.domain.exceptions import TaxguideError
 
 
 def crawl(
-    url: str,
+    url: Annotated[str | None, typer.Argument()] = None,
+    source: Annotated[str | None, typer.Option(help="Named source in the source manifest.")] = None,
+    sources_file: Annotated[Path, typer.Option(help="Source-policy YAML file.")] = Path(
+        "configs/sources.yaml"
+    ),
     max_pages: Annotated[int | None, typer.Option(min=1)] = None,
     max_depth: Annotated[int | None, typer.Option(min=0)] = None,
     delay: Annotated[float | None, typer.Option(min=0)] = None,
@@ -36,11 +41,21 @@ def crawl(
             level=settings.logging.level, format="%(levelname)s %(name)s %(message)s"
         )
         crawler_config = settings.crawler
+        source_policy = load_source_manifest(sources_file).get(source) if source else None
+        selected_url = url or (source_policy.seed_url if source_policy else None)
+        if selected_url is None:
+            raise ValueError("provide a URL or --source")
+        allowed_hosts = (
+            source_policy.allowed_hosts if source_policy else crawler_config.allowed_hosts
+        )
+        allowed_paths = (
+            source_policy.allowed_paths if source_policy else crawler_config.allowed_path_prefixes
+        )
 
         def target_validator(target: str) -> None:
             # Redirect safety applies to every HTTP request, including robots.txt.
             # Content path scoping remains the crawler's responsibility.
-            validate_target(target, crawler_config.allowed_hosts)
+            validate_target(target, allowed_hosts)
 
         http = SafeHttpClient(
             user_agent=crawler_config.user_agent,
@@ -55,13 +70,15 @@ def crawl(
         crawler = SkatteetatenCrawler(
             http,
             FileCrawlArtifactRepository(output_dir),
-            allowed_hosts=crawler_config.allowed_hosts,
-            allowed_path_prefixes=crawler_config.allowed_path_prefixes,
+            allowed_hosts=allowed_hosts,
+            allowed_path_prefixes=allowed_paths,
+            allowed_languages=source_policy.language if source_policy else (),
+            source_id=source_policy.id if source_policy else None,
             user_agent=crawler_config.user_agent,
         )
         result = crawler.crawl(
             CrawlRequest(
-                url=url,
+                url=selected_url,
                 max_pages=max_pages if max_pages is not None else crawler_config.max_pages,
                 max_depth=max_depth if max_depth is not None else crawler_config.max_depth,
                 follow_links=not no_follow,

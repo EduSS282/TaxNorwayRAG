@@ -1,0 +1,8 @@
+sources:
+  - id: skatteetaten-tax-return-en
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/tax-return/
+    language: [en]
+    priority: 100
+    allowed_paths:
+      - /en/person/taxes/tax-return/

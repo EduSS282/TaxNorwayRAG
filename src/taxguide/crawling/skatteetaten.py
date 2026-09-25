@@ -52,6 +52,8 @@ class SkatteetatenCrawler:
         *,
         allowed_hosts: tuple[str, ...] = ("www.skatteetaten.no", "skatteetaten.no"),
         allowed_path_prefixes: tuple[str, ...] = (),
+        allowed_languages: tuple[str, ...] = (),
+        source_id: str | None = None,
         user_agent: str = "TaxGuideNorwayCrawler/0.1",
         clock: Callable[[], datetime] = utc_now,
     ) -> None:
@@ -59,6 +61,8 @@ class SkatteetatenCrawler:
         self.repository = repository or FileCrawlArtifactRepository()
         self.allowed_hosts = allowed_hosts
         self.allowed_path_prefixes = allowed_path_prefixes
+        self.allowed_languages = allowed_languages
+        self.source_id = source_id
         self.user_agent = user_agent
         self.clock = clock
         self._robots: dict[str, RobotFileParser | bool] = {}
@@ -83,11 +87,13 @@ class SkatteetatenCrawler:
             visited.add(url)
             attempts += 1
             try:
-                self._check_robots(url)
-                response = self.http.fetch(url)
+                response = self.http.fetch(url, before_request=self._allow_content_request)
                 self._validate(response.url)
                 visited.add(normalize_url(response.url))
                 page = self._page(original_url, response, content_ids)
+                if self.allowed_languages and page.language not in self.allowed_languages:
+                    skipped.append(url)
+                    continue
                 previous_hash = self.repository.content_hash_for(page.document_id)
                 change_status = (
                     SourceChangeStatus.NEW
@@ -167,6 +173,10 @@ class SkatteetatenCrawler:
     def _validate(self, url: str) -> None:
         validate_target(url, self.allowed_hosts, self.allowed_path_prefixes)
 
+    def _allow_content_request(self, url: str) -> None:
+        self._validate(url)
+        self._check_robots(url)
+
     def _check_robots(self, url: str) -> None:
         parts = urlsplit(url)
         key = f"{parts.scheme}://{parts.netloc.lower()}"
@@ -213,6 +223,7 @@ class SkatteetatenCrawler:
         # the identity so two acquired aliases can never overwrite one another.
         document_id = document_id_from_url(final_url)
         return CrawledPage(
+            source_id=self.source_id,
             original_url=original_url,
             final_url=final_url,
             canonical_url=canonical,

@@ -33,6 +33,7 @@ class SourceChangeStatus(StrEnum):
 
 
 class CrawledPage(CrawlModel):
+    source_id: str | None = None
     original_url: str
     final_url: str
     canonical_url: str | None = None
