@@ -47,6 +47,18 @@ def test_grounded_prompt_is_deterministic() -> None:
     assert first == second
 
 
+@pytest.mark.parametrize(
+    "language,name", [("en", "English"), ("nb", "Norwegian Bokmål"), ("es", "Spanish")]
+)
+def test_response_language_changes_instructions_not_evidence(language, name) -> None:
+    context = ContextBuilder(max_tokens=3).build([ScoredChunk(chunk=_chunk(), score=1.0)])
+    original = build_grounded_messages("Question", context)
+    localized = build_grounded_messages("Question", context, response_language=language)
+    assert f"missing information in {name}." in localized[0]["content"]
+    assert "Preserve citation IDs" in localized[0]["content"]
+    assert localized[1] == original[1]
+
+
 @pytest.mark.parametrize("question", ["", "   "])
 def test_grounded_prompt_rejects_blank_question(question: str) -> None:
     with pytest.raises(ValueError, match="question"):

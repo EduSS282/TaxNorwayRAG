@@ -6,7 +6,8 @@ pipeline, four retrieval modes, tax-year-aware filtering, deterministic tax rout
 contracts used by grounded generation.
 
 It provides an end-to-end `taxguide answer` command and a FastAPI HTTP boundary over the same
-retrieval, reranking, and grounded-answer services. A frontend is not implemented.
+retrieval, reranking, and grounded-answer services. A Next.js frontend in `frontend/` provides a
+local question interface, cited sources, tax-year/language controls, and a developer inspector.
 
 ## Implemented today
 
@@ -28,6 +29,8 @@ retrieval, reranking, and grounded-answer services. A frontend is not implemente
   quote-span and tax-year validation, explicit application statuses, and safe abstention;
 - unit/integration evaluation utilities and an opt-in live retrieval benchmark harness.
 - FastAPI retrieval, reranking, query, health/version, and process-local observability endpoints.
+- Next.js UI with English, Norwegian Bokmål and Spanish labels, requested answer language,
+  four-stage retrieval comparison, and opt-in inspection of the actual final answer context.
 
 See [current architecture](docs/architecture.md) for component boundaries and
 [grounded-generation status](docs/generation.md) for the remaining end-to-end work.
@@ -100,6 +103,22 @@ uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
 See [HTTP API and observability](docs/api.md) for requests, configuration, tracing, metrics, and
 security boundaries. Do not expose the unauthenticated API to the public Internet.
 
+### Open the app
+
+With the API running, open another terminal (Node.js 20.9+ required; Node 24 used in CI):
+
+```console
+cd frontend
+npm ci
+npm run dev
+```
+
+Open **http://127.0.0.1:3000**. No models are downloaded by the frontend. For a usable answer, first
+prepare the indexed corpus and model services above. The default mode is dense; the inspector
+requires the reranker as well. See the [frontend runbook](docs/frontend.md) for complete local
+startup, errors and production builds, and [three-machine deployment](docs/three-machine-deployment.md)
+to open the desktop-hosted app from the laptop through a private tunnel.
+
 The CLI also supports direct local-file ingestion and chunk inspection:
 
 ```bash
@@ -142,6 +161,8 @@ src/taxguide/rules/        Deterministic routing decisions
 src/taxguide/context/      Bounded generation context
 src/taxguide/generation/   Generation contracts, prompts, citations, and validation
 src/taxguide/evaluation/   Retrieval and generation metrics
+src/taxguide/api/          HTTP boundary and observability
+frontend/                 Next.js UI and fixed-destination API proxy
 ```
 
 ## Verification
@@ -152,6 +173,20 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
 ```
+
+Frontend checks (from `frontend/`):
+
+```console
+npm ci
+npm run typecheck
+npm run build
+npx playwright install chromium
+npm test
+```
+
+Browser tests run the production UI against a test-only HTTP upstream. Python tests independently
+exercise HTTP → grounded service → prompt with injected model doubles. These checks do not replace
+live corpus/model evaluation.
 
 The live retrieval benchmark and grounded-generation smoke test are opt-in and require a populated
 Qdrant collection plus the configured model services. See [retrieval](docs/retrieval.md) and
@@ -164,6 +199,9 @@ available under the host/path policy in `configs/base.yaml`. See [crawler](docs/
 ## Current limitations and next milestone
 
 - Service startup and model downloads remain external operational steps.
+- The UI is local/private, without authentication, chat persistence, or public deployment.
+  Requested answer language is a prompt instruction, not a verified translation; deterministic
+  clarification/abstention text remains English and source excerpts are never translated.
 - `CachingBatchingEmbedder` provides process-local batching/cache behavior but is not composed by
   the configured embedding factory and is not persistent.
 - Quote spans are checked for bounds and non-blank source text, but the schema does not carry a
@@ -190,6 +228,8 @@ contract and its remaining limitations.
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Open the app: frontend runbook](docs/frontend.md)
+- [HTTP API and observability](docs/api.md)
 - [Local runtime and hardware](docs/local-runtime.md)
 - [Desktop, laptop, and Oracle deployment](docs/three-machine-deployment.md)
 - [Grounded generation status](docs/generation.md)

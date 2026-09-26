@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from taxguide.domain.models import Chunk
+from taxguide.generation.language import ResponseLanguage
 from taxguide.retrieval.factory import RetrievalMode
 from taxguide.vectorstores.base import ScoredChunk
 
@@ -55,6 +56,8 @@ class RerankResponse(ApiModel):
 
 class QueryRequest(ApiModel):
     question: Question
+    response_language: ResponseLanguage | None = None
+    include_context: bool = False
     mode: RetrievalMode | None = None
     retrieval_limit: int = Field(default=5, ge=1, le=20)
     candidate_limit: int | None = Field(default=None, ge=1, le=100)

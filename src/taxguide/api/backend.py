@@ -6,6 +6,7 @@ from typing import Protocol
 from taxguide.config.models import AppConfig
 from taxguide.domain.models import Chunk
 from taxguide.generation.composition import build_grounded_service
+from taxguide.generation.language import ResponseLanguage
 from taxguide.generation.service import GroundedRagResult, GroundedRagService
 from taxguide.observability.request import timed_stage
 from taxguide.reranking.base import Reranker
@@ -38,6 +39,8 @@ class ApiBackend(Protocol):
         retrieval_limit: int,
         candidate_limit: int,
         tax_year: int | None,
+        response_language: ResponseLanguage | None = None,
+        include_context: bool = False,
     ) -> GroundedRagResult: ...
 
 
@@ -90,6 +93,8 @@ class ConfiguredBackend:
         retrieval_limit: int,
         candidate_limit: int,
         tax_year: int | None,
+        response_language: ResponseLanguage | None = None,
+        include_context: bool = False,
     ) -> GroundedRagResult:
         key = (mode, candidate_limit)
         with self._lock:
@@ -101,4 +106,10 @@ class ConfiguredBackend:
                     stage_timer=timed_stage,
                 )
             service = self._answer_services[key]
-        return service.answer(question, tax_year=tax_year, retrieval_limit=retrieval_limit)
+        return service.answer(
+            question,
+            tax_year=tax_year,
+            retrieval_limit=retrieval_limit,
+            response_language=response_language,
+            include_context=include_context,
+        )

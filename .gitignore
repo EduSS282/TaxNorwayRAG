@@ -12,3 +12,11 @@ dist/
 data/*/*
 !data/evaluation/retrieval_gold_v1.json
 !data/*/.gitkeep
+# Frontend build and local runtime artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/playwright-report/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+frontend/.env.local

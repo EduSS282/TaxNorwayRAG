@@ -33,6 +33,17 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
 
+For changes to `frontend/` or its HTTP contracts, also run from `frontend/`:
+
+npm ci
+npm run typecheck
+npm run build
+npx playwright install chromium
+npm test
+
+Keep `docs/frontend.md` and `docs/three-machine-deployment.md` aligned with startup commands,
+API fields, and the distinction between deterministic UI tests and live model evaluation.
+
 Report:
 - files changed
 - tests executed

@@ -64,6 +64,8 @@ class FakeBackend:
         retrieval_limit: int,
         candidate_limit: int,
         tax_year: int | None,
+        response_language: str | None = None,
+        include_context: bool = False,
     ) -> GroundedRagResult:
         self.calls.append(("query", question, mode, retrieval_limit, candidate_limit, tax_year))
         with timed_stage("retrieval"):
@@ -194,6 +196,8 @@ def test_failed_grounded_result_uses_unavailable_status() -> None:
             retrieval_limit: int,
             candidate_limit: int,
             tax_year: int | None,
+            response_language: str | None = None,
+            include_context: bool = False,
         ) -> GroundedRagResult:
             return GroundedRagResult(status=GroundedRagStatus.FAILED, error="retrieval failed")
 

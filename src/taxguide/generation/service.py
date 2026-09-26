@@ -12,6 +12,7 @@ from taxguide.domain.exceptions import TaxguideError, TemporalResolutionError
 from taxguide.domain.models import DomainModel
 from taxguide.generation.abstention import AbstentionPolicy
 from taxguide.generation.base import Generator
+from taxguide.generation.language import ResponseLanguage
 from taxguide.generation.models import RagAnswer
 from taxguide.generation.prompts import build_grounded_messages
 from taxguide.generation.validation import CitationValidationError, CitationValidator
@@ -45,6 +46,7 @@ class GroundedRagResult(DomainModel):
     evidence_count: int = Field(default=0, ge=0)
     generator_model: str | None = None
     error: str | None = None
+    final_context: GenerationContext | None = None
 
     @model_validator(mode="after")
     def status_fields_are_consistent(self) -> Self:
@@ -110,6 +112,8 @@ class GroundedRagService:
         *,
         tax_year: int | None = None,
         retrieval_limit: int = 5,
+        response_language: ResponseLanguage | None = None,
+        include_context: bool = False,
     ) -> GroundedRagResult:
         """Return a validated answer, clarification, abstention, or safe failure."""
         if not question.strip():
@@ -176,6 +180,7 @@ class GroundedRagService:
             return self._failed(decision, f"retrieval failed: {error}")
 
         context = self._context_builder.build(results)
+        exposed_context = context if include_context else None
         policy = AbstentionPolicy(minimum_evidence=decision.minimum_evidence)
         if policy.should_abstain(context, citations_valid=True):
             return GroundedRagResult(
@@ -186,11 +191,12 @@ class GroundedRagService:
                 ),
                 routing=decision,
                 evidence_count=len(context.evidence),
+                final_context=exposed_context,
             )
 
-        generated = self._generate(question, context, resolved_year, decision)
+        generated = self._generate(question, context, resolved_year, decision, response_language)
         if isinstance(generated, GroundedRagResult):
-            return generated
+            return generated.model_copy(update={"final_context": exposed_context})
         try:
             answer = RagAnswer.model_validate_json(generated)
         except ValidationError:
@@ -199,6 +205,7 @@ class GroundedRagService:
                 "generator returned invalid structured output",
                 evidence_count=len(context.evidence),
                 generator_model=self._generator.model_id,
+                final_context=exposed_context,
             )
 
         try:
@@ -215,6 +222,7 @@ class GroundedRagService:
                 routing=decision,
                 evidence_count=len(context.evidence),
                 generator_model=self._generator.model_id,
+                final_context=exposed_context,
             )
 
         return GroundedRagResult(
@@ -223,6 +231,7 @@ class GroundedRagService:
             routing=decision,
             evidence_count=len(context.evidence),
             generator_model=self._generator.model_id,
+            final_context=exposed_context,
         )
 
     def _generate(
@@ -231,8 +240,11 @@ class GroundedRagService:
         context: GenerationContext,
         tax_year: int | None,
         decision: RoutingDecision,
+        response_language: ResponseLanguage | None = None,
     ) -> str | GroundedRagResult:
-        messages = build_grounded_messages(question, context, tax_year=tax_year)
+        messages = build_grounded_messages(
+            question, context, tax_year=tax_year, response_language=response_language
+        )
         try:
             with self._stage_timer("generation"):
                 return self._generator.generate(
@@ -255,6 +267,7 @@ class GroundedRagService:
         *,
         evidence_count: int = 0,
         generator_model: str | None = None,
+        final_context: GenerationContext | None = None,
     ) -> GroundedRagResult:
         return GroundedRagResult(
             status=GroundedRagStatus.FAILED,
@@ -262,4 +275,5 @@ class GroundedRagService:
             evidence_count=evidence_count,
             generator_model=generator_model,
             error=message,
+            final_context=final_context,
         )

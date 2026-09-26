@@ -180,6 +180,8 @@ def create_app(
                 retrieval_limit=payload.retrieval_limit,
                 candidate_limit=candidate_limit,
                 tax_year=payload.tax_year,
+                response_language=payload.response_language,
+                include_context=payload.include_context,
             )
         except (TaxguideError, RuntimeError, ValueError) as exc:
             raise _api_error(exc) from exc

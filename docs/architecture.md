@@ -23,7 +23,22 @@ taxguide answer   → validated answer, clarification, abstention, or failure
 The FastAPI boundary exposes retrieval, reranking, and grounded answers through separate endpoints.
 It composes existing application services and adds request-scoped trace IDs, JSON access logs, and
 process-local latency metrics. It does not start external services or load model weights at import.
-There is no frontend or authenticated public deployment. See [API](api.md) and ADR 0009.
+The Next.js App Router frontend is a separate Node process. The browser posts only to its
+same-origin `/api/query` and `/api/retrieve` handlers, which forward JSON to a fixed server-side
+`TAXGUIDE_API_URL`. No Python/domain code is duplicated in the frontend. There is no authenticated
+public deployment. See [API](api.md), [frontend](frontend.md), ADR 0009 and ADR 0010.
+
+```text
+Browser → Next.js (3000) → fixed-destination proxy → FastAPI (8000)
+                                                    → existing application services
+```
+
+The UI renders the four grounded statuses, citations from validated answers, tax-year selection,
+and English/Bokmål/Spanish labels. `response_language` changes only generation instructions, not
+corpus filters or evidence. `include_context` exposes the real bounded `GenerationContext` for
+developer inspection; it is off by default. Diagnostic retrieval compares four independent
+retrieval runs, not intermediate stages captured from the same generated answer. The final-context
+panel, in contrast, belongs to the actual answer request, including its source IDs.
 
 ## Offline pipeline
 

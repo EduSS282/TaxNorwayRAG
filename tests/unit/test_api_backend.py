@@ -68,7 +68,13 @@ def test_backend_reuses_reranker_and_answer_service(monkeypatch: pytest.MonkeyPa
 
     class FakeAnswerService:
         def answer(
-            self, question: str, *, tax_year: int | None, retrieval_limit: int
+            self,
+            question: str,
+            *,
+            tax_year: int | None,
+            retrieval_limit: int,
+            response_language: str | None = None,
+            include_context: bool = False,
         ) -> GroundedRagResult:
             return GroundedRagResult(
                 status=GroundedRagStatus.CLARIFICATION_REQUIRED,

@@ -1,0 +1,120 @@
+# Interfaz local: abrir y usar TaxGuide Norway
+
+La interfaz de los issues #73–#78 está en `frontend/`: Next.js App Router, React y TypeScript.
+El backend fiscal sigue siendo Python. No hay datos simulados en la aplicación: las respuestas
+vienen de la API configurada; las fixtures solo se usan en pruebas.
+
+## Arranque local
+
+Requisitos: Python 3.12+, uv, Node.js 20.9+ (CI usa Node 24), npm y los servicios de
+[runtime local](local-runtime.md). Para una respuesta generada hacen falta corpus indexado,
+embeddings, Qdrant y generador. El modo reranked y la comparación requieren además reranker.
+
+1. Desde la raíz: `uv sync --locked`. Prepara los modelos y el corpus según el README; la UI no
+   descarga pesos ni indexa documentos.
+2. Terminal de API, desde la raíz:
+
+   ```powershell
+   uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+   ```
+
+   Si usas un overlay, define `$env:TAXGUIDE_OVERLAY = "configs/desktop.yaml"` antes del comando
+   (ese nombre es ilustrativo, no un archivo incluido). Las rutas YAML siguen siendo relativas a
+   la raíz. Los detalles están en [API](api.md).
+
+3. Otra terminal:
+
+   ```powershell
+   cd frontend
+   npm ci
+   npm run dev
+   ```
+
+4. Abre **http://127.0.0.1:3000**. Detén cada proceso con Ctrl+C cuando termines.
+
+Por defecto el proxy usa `http://127.0.0.1:8000`. Si necesitas cambiarlo, configura
+`TAXGUIDE_API_URL` en el entorno de Node o en `frontend/.env.local`, siguiendo `.env.example`.
+Es una variable de servidor: no uses `NEXT_PUBLIC_`. Reinicia Next.js al cambiarla. Se utiliza
+el origen de la URL (sin prefijos de ruta); solo se admiten HTTP/HTTPS sin credenciales.
+
+Para uso habitual, compila una vez y sirve sin recarga de desarrollo:
+
+```console
+cd frontend
+npm ci
+npm run build
+npm start
+```
+
+No ejecutes `dev` y `build` simultáneamente sobre el mismo directorio `.next`. El frontend y la
+API escuchan en loopback, sin autenticación. Para sobremesa + portátil + Oracle consulta
+[el despliegue de tres máquinas](three-machine-deployment.md#abrir-la-app-en-sobremesa-y-portátil).
+
+## Flujo de uso
+
+- Escribe una pregunta de hasta 4000 caracteres, sin nombres, números de identidad ni datos
+  personales. Se envía a tus servicios configurados; «local» no convierte un endpoint remoto
+  configurado por el operador en un endpoint privado.
+- Selecciona un año entero entre 1900 y 2100 o déjalo vacío para la resolución/clarificación de
+  la API. No es un catálogo de años indexados. Un año que contradiga la pregunta devuelve 422.
+- Selecciona English, Norsk bokmål o Español. Cambia los textos de la interfaz y solicita ese
+  idioma al generador. No traduce las fuentes ni filtra el corpus por idioma. Los mensajes
+  deterministas de aclaración/abstención pueden seguir en inglés; no se verifica la traducción.
+- Pulsa «Buscar respuesta». La interfaz diferencia respuesta, aclaración, abstención y error.
+  Las citas muestran ID, título, URL original y chunk; solo HTTP(S) se convierte en enlace.
+  La confianza es del modelo, no una probabilidad calibrada de exactitud.
+- Al editar pregunta, año, idioma o controles del inspector se borran resultados anteriores para
+  no presentarlos como pertenecientes a una configuración nueva. No se conserva historial.
+
+## Inspector (#78)
+
+Abre «Inspector de retrieval para desarrolladores». Puedes cambiar dense / hybrid / hybrid +
+rerank para la respuesta. Activa «Incluir contexto final en la respuesta» antes de preguntar:
+el panel mostrará los chunks realmente seleccionados por `ContextBuilder`, sus IDs S1…, puntuación,
+texto, año, idioma y procedencia. Si el servicio terminó antes de construir contexto no hay panel;
+si construyó uno vacío, se muestra vacío. Las fuentes citadas son un subconjunto distinto del
+contexto disponible, no todos los resultados recuperados.
+
+«Comparar retrieval» llama a `/v1/retrieve` con `mode: all` y muestra dense, sparse, fused y
+reranked, cinco resultados por etapa y el límite de candidatos configurado en la API (diez en
+`configs/base.yaml`). La respuesta también respeta ese límite. Requiere todos los servicios y puede
+ser costoso. Las cuatro búsquedas se ejecutan de manera independiente; no representan los pasos
+capturados de la misma respuesta. Las escalas de puntuación no son comparables entre etapas.
+Puedes tener respuesta/contexto y comparación visibles para la misma pregunta; sus trace IDs
+se muestran por separado. No hay persistencia de trazas ni evaluación automática de calidad.
+
+## Diagnóstico
+
+| Síntoma | Comprobación |
+| --- | --- |
+| No abre 3000 | Proceso Node y puerto; usa la dirección loopback de la máquina o el túnel |
+| HTTP 502 | API no accesible desde Node, URL incorrecta, respuesta no JSON o timeout del proxy |
+| HTTP 503 | API activa pero Qdrant/modelo/configuración no disponibles; revisa logs con trace ID |
+| HTTP 422 | Año contradictorio, límites o entrada rechazados por la API |
+| Abstención | No se alcanzó evidencia válida suficiente; no es necesariamente un fallo de red |
+| Funciona dense pero no comparar | Verifica BM25/corpus y reranker, además de embeddings/Qdrant |
+
+El proxy espera hasta 180 segundos y el navegador 190; un timeout no garantiza que se cancele
+el cómputo Python ya iniciado. Las solicitudes son sin caché, sin reintentos automáticos y no
+reenvían cookies ni cabeceras del navegador a la API. Solo hay dos destinos permitidos. Se
+rechazan peticiones con origen explícito distinto; esto no sustituye autenticación o protección
+de un despliegue público. No expongas estos servicios sin una pasarela autenticada.
+
+## Verificación y límites
+
+Desde `frontend/`:
+
+```console
+npm ci
+npm run typecheck
+npm run build
+npx playwright install chromium
+npm test
+```
+
+Playwright usa los puertos loopback 13000 y 18001 y comprueba la UI compilada contra un upstream
+de pruebas: formulario, idioma/año, citas, contexto, comparación, estados vacíos/de error,
+loading, vista móvil y controles del proxy. No se conecta a los modelos reales. Los tests Python
+comprueban por separado API → servicio → prompt/contexto con dependencias inyectadas. CI ejecuta
+ambos grupos. La revisión visual y estos tests no reemplazan el benchmark de corpus/modelos reales,
+que sigue pendiente. No hay chat persistente, cuentas, despliegue público, ni gestión de modelos.

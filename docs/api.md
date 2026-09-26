@@ -29,7 +29,7 @@ connection errors are returned as service-unavailable responses, without downstr
 | --- | --- | --- |
 | `POST /v1/retrieve` | `query`, optional `mode`, `tax_year`, `limit`, `candidate_limit` | Mode and ranked `ScoredChunk` results |
 | `POST /v1/rerank` | `query`, full candidate `chunks`, optional `limit` | Reranked `ScoredChunk` results |
-| `POST /v1/query` | `question`, optional `mode`, `tax_year`, `retrieval_limit`, `candidate_limit` | Structured `GroundedRagResult` |
+| `POST /v1/query` | `question`, optional `mode`, `tax_year`, `retrieval_limit`, `candidate_limit`, `response_language`, `include_context` | Structured `GroundedRagResult` |
 | `GET /v1/health` | none | Liveness status only |
 | `GET /v1/version` | none | Package and API version |
 | `GET /v1/metrics` | none | Per-process aggregate latency seconds by stage |
@@ -42,6 +42,14 @@ the same tax-year resolver and post-retrieval year guard as the CLI. `/v1/rerank
 TaxGuide `Chunk` objects, including source metadata, so result provenance is preserved. The
 interactive OpenAPI schema is available at `/docs` on the bound interface.
 
+`response_language` accepts `en`, `nb`, `es`, or null (existing prompt behavior). It asks the model
+to use that language for prose/warnings/missing information without altering citation IDs, URLs,
+titles or source excerpts. Compliance is not language-validated. Deterministic clarification and
+abstention remain English. `include_context: true` returns the actual bounded evidence under
+`final_context.evidence` (each item has `evidence_id`, `chunk`, `score`); otherwise `final_context`
+is null. It is also null if routing/retrieval ended before context construction. An empty
+constructed context has an empty evidence list. This is opt-in response data, never an access log.
+
 Example (PowerShell):
 
 ```powershell
@@ -51,7 +59,7 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/v1/retrieve" `
 
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/v1/query" `
   -ContentType "application/json" `
-  -Body '{"question":"What is the tax return deadline for 2025?","mode":"hybrid"}'
+  -Body '{"question":"What is the tax return deadline for 2025?","mode":"hybrid","response_language":"es","include_context":true}'
 ```
 
 Request validation errors use HTTP 422. Cross-year retriever violations use 502; unavailable
@@ -74,5 +82,5 @@ searchable backend or propagated to Qdrant/model HTTP calls. OpenTelemetry expor
 The API has no authentication, rate limiting, CORS policy for browser clients, or TLS termination.
 Do not expose it directly to the public Internet; use loopback, a private tunnel, or an
 authenticated gateway. Run one worker on constrained local hardware unless measured otherwise:
-each worker has its own cached adapters and metrics. There is no frontend or orchestration of
-external model processes.
+each worker has its own cached adapters and metrics. The [frontend](frontend.md) uses a server-side
+proxy, so browser CORS is not needed. Neither process orchestrates external model services.

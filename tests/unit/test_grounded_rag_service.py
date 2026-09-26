@@ -5,7 +5,10 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 
 import pytest
+from fastapi.testclient import TestClient
 
+from taxguide.api.app import create_app
+from taxguide.config.models import AppConfig
 from taxguide.context.builder import ContextBuilder
 from taxguide.domain.exceptions import TemporalResolutionError
 from taxguide.domain.models import Chunk, ChunkMetadata
@@ -81,6 +84,53 @@ def test_service_returns_a_validated_grounded_answer() -> None:
         )
     ]
     assert "untrusted quoted data" in generator.calls[0][0]["content"]
+    assert result.final_context is None
+
+
+def test_language_and_opt_in_context_reach_actual_generation() -> None:
+    chunk = _chunk("a", tax_year=2026)
+    generator = StubGenerator(_answer(chunk, tax_year=2026).model_dump_json())
+    result = _service(RecordingRetriever([ScoredChunk(chunk=chunk, score=0.9)]), generator).answer(
+        "Explain Norwegian wealth tax for 2026.", response_language="es", include_context=True
+    )
+    assert result.status is GroundedRagStatus.ANSWERED
+    assert "in Spanish." in generator.calls[0][0]["content"]
+    assert result.final_context is not None
+    assert result.final_context.evidence[0].chunk == chunk
+    assert result.final_context.render() in generator.calls[0][1]["content"]
+    assert result.final_context.evidence[0].evidence_id == result.answer.citations[0].citation_id
+
+
+def test_context_not_fabricated_when_routing_clarifies() -> None:
+    result = _service(RecordingRetriever([]), StubGenerator("unused")).answer(
+        "Where do I report foreign income?", include_context=True
+    )
+    assert result.status is GroundedRagStatus.CLARIFICATION_REQUIRED
+    assert result.final_context is None
+
+
+@pytest.mark.parametrize("language", ["en", "nb", "es"])
+def test_http_options_reach_configured_answer_service(monkeypatch, language) -> None:
+    chunk = _chunk("a", tax_year=2026)
+    generator = StubGenerator(_answer(chunk, tax_year=2026).model_dump_json())
+    service = _service(RecordingRetriever([ScoredChunk(chunk=chunk, score=0.9)]), generator)
+    monkeypatch.setattr("taxguide.api.backend.build_grounded_service", lambda *a, **kw: service)
+    with TestClient(create_app(settings=AppConfig())) as client:
+        response = client.post(
+            "/v1/query",
+            json={
+                "question": "Explain Norwegian wealth tax.",
+                "tax_year": 2026,
+                "response_language": language,
+                "include_context": True,
+            },
+        )
+        invalid = client.post("/v1/query", json={"question": "tax", "response_language": "xx"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "answered"
+    assert response.json()["final_context"]["evidence"][0]["chunk"]["id"] == chunk.id
+    assert response.headers["x-trace-id"]
+    assert invalid.status_code == 422
 
 
 def test_service_records_retrieval_and_generation_stages() -> None:

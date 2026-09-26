@@ -29,3 +29,6 @@ or Qdrant. Health is liveness, not dependency readiness. Traces and metrics are 
 there is no external collector or downstream span propagation. The API has no authentication,
 rate limiting, public TLS termination, frontend, or model-service supervision. Those operational
 capabilities must be added before a public deployment.
+
+Follow-up: ADR 0010 adds a separate local frontend and fixed-destination proxy. Authentication,
+public deployment and model-service supervision remain outside this decision.

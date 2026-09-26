@@ -7,7 +7,7 @@ hardware disponible:
 - portátil: Intel i7-13700H y 16 GB de RAM DDR5;
 - Oracle Free Tier: 2 OCPU y 12 GB de RAM.
 
-La CLI `taxguide` y la API FastAPI de consulta son puntos de entrada implementados. La API carece
+La CLI `taxguide`, la API FastAPI y la interfaz Next.js son puntos de entrada implementados. La API carece
 de autenticación: úsala en loopback o tras una pasarela privada autenticada. Qdrant, Ollama y
 llama.cpp son procesos externos que TaxGuide consume por HTTP.
 
@@ -19,8 +19,8 @@ responder preguntas locales.
 
 | Máquina | Responsabilidad recomendada | Procesos |
 | --- | --- | --- |
-| Sobremesa | Orquestación y respuesta interactiva | TaxGuide CLI/API, Qdrant, embeddings y generador |
-| Portátil | Desarrollo, pruebas y reranking opcional | repositorio, pytest/Ruff/mypy, llama.cpp reranker en CPU |
+| Sobremesa | Orquestación y respuesta interactiva | TaxGuide CLI/API, Next.js, Qdrant, embeddings y generador |
+| Portátil | Navegador, desarrollo, pruebas y reranking opcional | túnel SSH, repositorio, pruebas, llama.cpp reranker en CPU |
 | Oracle VM | Trabajo persistente no interactivo | crawling programado, informes, sincronización y copias |
 
 ```text
@@ -29,7 +29,7 @@ Oracle VM ──crawl/manifests──► sobremesa ──embed/index──► Qd
                                   │                         │
                                   │ consulta                │ evidencia
                                   ▼                         │
-                       TaxGuide CLI ◄───────────────────────┘
+                    TaxGuide CLI/API ◄──────────────────────┘
                           │       │
                           │       └──► llama.cpp 4B, GTX 1060 ──► respuesta estructurada
                           │
@@ -39,6 +39,45 @@ Oracle VM ──crawl/manifests──► sobremesa ──embed/index──► Qd
 No pongas la VM en el camino crítico de una consulta. Dos OCPU son adecuados para crawling lento,
 automatización y coordinación, pero no para servir de forma interactiva embeddings, reranking o un
 LLM de 4B.
+
+## Abrir la app en sobremesa y portátil
+
+Primero prepara corpus, Qdrant y modelos siguiendo la etapa 1 de esta guía. Después mantén dos
+terminales en el sobremesa. En la primera, desde la raíz del repositorio:
+
+```powershell
+uv sync --locked
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+```
+
+En la segunda (Node.js 20.9+; recomendamos la versión 24 usada en CI):
+
+```powershell
+cd frontend
+npm ci
+npm run build
+npm start
+```
+
+Abre **http://127.0.0.1:3000** en el sobremesa. Para desarrollo con recarga, usa `npm run dev` en
+lugar de `npm run build`/`npm start`. La interfaz llama a la API local del sobremesa; no necesita
+URLs de Qdrant o modelos en el navegador. Véase [guía de la interfaz](frontend.md).
+
+Para usarla desde el portátil, el sobremesa debe tener un servidor SSH configurado, autenticación
+por clave y acceso por red privada. En el portátil, sustituye usuario y dirección:
+
+```powershell
+ssh -N -L 3000:127.0.0.1:3000 USUARIO@IP_PRIVADA_SOBREMESA
+```
+
+Mantén el túnel abierto y visita **http://127.0.0.1:3000** en el portátil. No necesitas Node, Python
+ni modelos en el portátil si solo usas el navegador. Si el puerto local está ocupado, usa
+`-L 3001:127.0.0.1:3000` y visita `http://127.0.0.1:3001`.
+
+Alternativa para desarrollar la UI en el portátil: ejecuta Next.js allí y crea un túnel
+`ssh -N -L 8000:127.0.0.1:8000 USUARIO@IP_PRIVADA_SOBREMESA`. Su `TAXGUIDE_API_URL` seguirá siendo
+`http://127.0.0.1:8000`. Oracle continúa solo con tareas offline; no es necesario desplegar allí
+la UI ni abrir los puertos 3000/8000/6333/8080/11434 a Internet. No se crean túneles automáticamente.
 
 ## Etapa 1: validar todo en el sobremesa
 
@@ -319,7 +358,8 @@ no es posible comparar de forma fiable un cambio de modelo o de máquina.
 
 - TaxGuide no inicia ni supervisa Qdrant, Ollama, llama.cpp o los túneles SSH.
 - No existe failover automático entre sobremesa, portátil y Oracle.
-- Existe una API HTTP de consulta, pero no autenticación integrada ni interfaz web.
+- Existen API HTTP e interfaz Next.js, pero no autenticación integrada; úsala solo en local
+  o mediante un túnel privado. La interfaz no descarga modelos ni inicia servicios externos.
 - El cache de embeddings es local al proceso, no persistente y no está compuesto por la factory.
 - No hay un benchmark real de corpus/generación con umbrales de release comprometido al repositorio.
 - El servicio remoto de reranking no tiene autenticación propia.
