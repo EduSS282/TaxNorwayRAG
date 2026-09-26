@@ -4,6 +4,9 @@
 
 Accepted for development.
 
+Follow-up: [ADR 0011](0011-operator-connections-and-local-services.md) adds opt-in local
+process ownership; the original external-inference topology remains unchanged.
+
 ## Context
 
 TaxGuide uses an embedding model, a reranker, and a small instruction model. The available hardware

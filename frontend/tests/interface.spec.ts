@@ -129,6 +129,7 @@ test("proxy allowlist, input guards, upstream status and trace preservation", as
   expect(await response.json()).toEqual({
     payload: { question: "echo", tax_year: 2025, response_language: "nb" },
     cookie: null,
+    authorization: null,
   });
   expect(response.headers()["x-trace-id"]).toBe("answer-trace");
   expect(response.headers()["cache-control"]).toBe("no-store");

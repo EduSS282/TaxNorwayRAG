@@ -2,6 +2,9 @@
 
 Status: accepted. Scope: issues #73–#78, User Interface v0.9.
 
+Follow-up: [ADR 0011](0011-operator-connections-and-local-services.md) adds `/settings` and
+the fixed admin proxy destination, forwarding authorization exclusively to that endpoint.
+
 ## Context
 
 The existing FastAPI boundary already owns grounded answers and diagnostic retrieval. The UI

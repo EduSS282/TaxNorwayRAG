@@ -146,8 +146,9 @@ connectivity/orchestration smoke check, not a quality benchmark.
   filtering to avoid false-empty retrieval.
 - The embedding cache is process-local, not integrated by the factory, and not persistent.
 - No reproducible real-corpus retrieval/generation baseline or release threshold is committed.
-- The HTTP API exposes the same grounded service at `/v1/query`, but has no authentication,
-  model-process supervision, or automatic fallback; use loopback or a private gateway.
+- The HTTP API exposes the same grounded service at `/v1/query`, without query authentication
+  or automatic fallback; use loopback or a private gateway. Optional authenticated runtime
+  administration can supervise preconfigured local services; see [runtime management](runtime-management.md).
 - The [frontend](frontend.md) requests `response_language` (`en`, `nb`, `es`) and optionally
   `include_context`. The former changes the generation prompt only; the latter returns the exact
   selected context without changing retrieval or generation. Language compliance is not verified,

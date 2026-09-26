@@ -106,8 +106,9 @@ Invoke-RestMethod -Uri "http://127.0.0.1:6333/healthz"
 ```
 
 El volumen persistente queda en `data/qdrant`. El `compose.yaml` del repositorio es únicamente para
-desarrollo local: publica Qdrant en el host y no debe copiarse sin cambios a una máquina expuesta a
-Internet.
+desarrollo local: publica Qdrant solo en loopback del host. No lo expongas a Internet; usa túneles
+privados para otros equipos. Los contenedores creados con el compose anterior conservan sus
+bindings hasta recrearlos; compruébalos antes de habilitar su gestión desde la app.
 
 ### 3. Iniciar embeddings
 
@@ -356,10 +357,14 @@ no es posible comparar de forma fiable un cambio de modelo o de máquina.
 
 ## Qué no está automatizado todavía
 
-- TaxGuide no inicia ni supervisa Qdrant, Ollama, llama.cpp o los túneles SSH.
+- El panel `/settings` puede iniciar/parar Qdrant, Ollama y llama.cpp preconfigurados solo en
+  la máquina de la API. No controla procesos remotos ni túneles SSH. Consulta
+  [conexiones y servicios](runtime-management.md) para habilitarlo.
 - No existe failover automático entre sobremesa, portátil y Oracle.
-- Existen API HTTP e interfaz Next.js, pero no autenticación integrada; úsala solo en local
-  o mediante un túnel privado. La interfaz no descarga modelos ni inicia servicios externos.
+- Existen API HTTP e interfaz Next.js; solo la administración tiene clave, no las consultas.
+  Úsala en local o mediante un túnel privado. La interfaz no descarga modelos ni los inicia
+  en otra máquina: si Python corre en el sobremesa y navegas desde el portátil, «local» es el
+  sobremesa. Qdrant en Oracle se configura mediante el endpoint/túnel autorizado y se arranca allí.
 - El cache de embeddings es local al proceso, no persistente y no está compuesto por la factory.
 - No hay un benchmark real de corpus/generación con umbrales de release comprometido al repositorio.
 - El servicio remoto de reranking no tiene autenticación propia.

@@ -47,7 +47,7 @@ npm start
 ```
 
 No ejecutes `dev` y `build` simultáneamente sobre el mismo directorio `.next`. El frontend y la
-API escuchan en loopback, sin autenticación. Para sobremesa + portátil + Oracle consulta
+API escuchan en loopback; las consultas siguen sin autenticación. Para sobremesa + portátil + Oracle consulta
 [el despliegue de tres máquinas](three-machine-deployment.md#abrir-la-app-en-sobremesa-y-portátil).
 
 ## Flujo de uso
@@ -65,6 +65,23 @@ API escuchan en loopback, sin autenticación. Para sobremesa + portátil + Oracl
   La confianza es del modelo, no una probabilidad calibrada de exactitud.
 - Al editar pregunta, año, idioma o controles del inspector se borran resultados anteriores para
   no presentarlos como pertenecientes a una configuración nueva. No se conserva historial.
+
+## Conexiones y servicios
+
+El enlace «Conexiones y servicios» abre `/settings`. Sigue primero la
+[preparación del administrador](runtime-management.md): clave en el backend, destinos permitidos
+y perfiles locales de ejecutables/modelos. El panel se mantiene bloqueado hasta introducir la
+clave; se guarda solo en memoria de esa página, no en almacenamiento del navegador.
+
+Puedes editar y comprobar un borrador, guardar conexiones sin reiniciar la API, restaurar la
+configuración anterior y consultar estados. Con perfiles válidos puedes iniciar/parar servicios
+locales o pulsar «Preparar servicios» para el modo elegido. Una parada requiere confirmación.
+Si una dependencia está arrancando, espera y pulsa «Comprobar servicios»; vuelve a preparar cuando
+esté lista. No hay arranque automático al abrir el panel ni descarga de modelos.
+
+«Local» es la máquina de Python, aunque abras la app desde el portátil. Los destinos remotos se
+pueden configurar y comprobar, pero su arranque sigue siendo manual. Los cambios del panel afectan
+solo a la API, no al YAML del CLI. El panel de administración está en español.
 
 ## Inspector (#78)
 
@@ -96,7 +113,8 @@ se muestran por separado. No hay persistencia de trazas ni evaluación automáti
 
 El proxy espera hasta 180 segundos y el navegador 190; un timeout no garantiza que se cancele
 el cómputo Python ya iniciado. Las solicitudes son sin caché, sin reintentos automáticos y no
-reenvían cookies ni cabeceras del navegador a la API. Solo hay dos destinos permitidos. Se
+reenvían cookies ni cabeceras del navegador a la API, excepto `Authorization` exclusivamente para
+`/api/admin`. Solo están permitidas las operaciones query, retrieve y admin en el backend fijo. Se
 rechazan peticiones con origen explícito distinto; esto no sustituye autenticación o protección
 de un despliegue público. No expongas estos servicios sin una pasarela autenticada.
 
@@ -117,4 +135,6 @@ de pruebas: formulario, idioma/año, citas, contexto, comparación, estados vac�
 loading, vista móvil y controles del proxy. No se conecta a los modelos reales. Los tests Python
 comprueban por separado API → servicio → prompt/contexto con dependencias inyectadas. CI ejecuta
 ambos grupos. La revisión visual y estos tests no reemplazan el benchmark de corpus/modelos reales,
-que sigue pendiente. No hay chat persistente, cuentas, despliegue público, ni gestión de modelos.
+que sigue pendiente. También se prueban desbloqueo, borradores, guardado/restauración, controles de
+servicios y aislamiento de la clave en el proxy. No hay chat persistente, cuentas, despliegue
+público, descargas de modelos ni control de procesos remotos.

@@ -32,7 +32,9 @@ The default configuration expects:
 | llama.cpp reranker | `http://127.0.0.1:8001` | `/v1/rerank` |
 | llama.cpp generator | `http://127.0.0.1:8080` | `/v1/chat/completions` grounded generation |
 
-Model services are operator-managed. TaxGuide does not start, stop, update, or supervise them.
+Model installation and updates remain operator-managed. Optional authenticated controls in
+`/settings` can start/stop preconfigured services on the API host, never remote processes; see
+[runtime management](runtime-management.md). Manual startup below remains supported.
 
 ## 1. Verify the GPU runtime
 

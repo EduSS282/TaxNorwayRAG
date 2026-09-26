@@ -31,6 +31,8 @@ local question interface, cited sources, tax-year/language controls, and a devel
 - FastAPI retrieval, reranking, query, health/version, and process-local observability endpoints.
 - Next.js UI with English, Norwegian Bokmål and Spanish labels, requested answer language,
   four-stage retrieval comparison, and opt-in inspection of the actual final answer context.
+- Opt-in operator settings for saved model/Qdrant connections, dependency checks, and safe
+  start/stop of preconfigured services on the API host.
 
 See [current architecture](docs/architecture.md) for component boundaries and
 [grounded-generation status](docs/generation.md) for the remaining end-to-end work.
@@ -51,8 +53,9 @@ uv sync --locked
 uv run taxguide --help
 ```
 
-The Python test suite does not require a GPU or live model server. Runtime model weights are not
-downloaded by TaxGuide itself.
+The Python test suite does not require a GPU or live model server. Managed external runtimes
+require weights installed beforehand. The optional in-process sentence-transformers adapters may
+fetch missing weights on first inference; prepare their cache/offline settings separately.
 
 ## Local workflow
 
@@ -119,6 +122,12 @@ requires the reranker as well. See the [frontend runbook](docs/frontend.md) for 
 startup, errors and production builds, and [three-machine deployment](docs/three-machine-deployment.md)
 to open the desktop-hosted app from the laptop through a private tunnel.
 
+Open **http://127.0.0.1:3000/settings** for connections and local services. Administration is
+disabled until the API has an operator key; executable/model paths must be configured in a trusted
+local profile. Follow [runtime management](docs/runtime-management.md) for first-time setup.
+“Local” means the Python API machine, not the browser machine. Model downloads and corpus indexing
+remain manual; remote endpoints can be used and checked, but not remotely started or stopped.
+
 The CLI also supports direct local-file ingestion and chunk inspection:
 
 ```bash
@@ -162,6 +171,7 @@ src/taxguide/context/      Bounded generation context
 src/taxguide/generation/   Generation contracts, prompts, citations, and validation
 src/taxguide/evaluation/   Retrieval and generation metrics
 src/taxguide/api/          HTTP boundary and observability
+src/taxguide/runtime/      Operator connections and owned local-service lifecycle
 frontend/                 Next.js UI and fixed-destination API proxy
 ```
 
@@ -198,8 +208,10 @@ available under the host/path policy in `configs/base.yaml`. See [crawler](docs/
 
 ## Current limitations and next milestone
 
-- Service startup and model downloads remain external operational steps.
-- The UI is local/private, without authentication, chat persistence, or public deployment.
+- Model installation/downloads, corpus indexing, and remote service startup remain operator steps.
+  Optional local start/stop requires trusted profiles and one API worker.
+- The UI is local/private. Only runtime administration has operator authentication; query endpoints
+  remain unauthenticated. There is no chat persistence or public deployment.
   Requested answer language is a prompt instruction, not a verified translation; deterministic
   clarification/abstention text remains English and source excerpts are never translated.
 - `CachingBatchingEmbedder` provides process-local batching/cache behavior but is not composed by
@@ -216,8 +228,9 @@ available under the host/path policy in `configs/base.yaml`. See [crawler](docs/
   no committed production-quality corpus, results, thresholds, or hardware manifest.
 - The crawler does not execute JavaScript, submit forms, enter authenticated areas, or traverse
   interactive wizard branches.
-- The API has no authentication, rate limiting, distributed tracing exporter, or dependency
-  readiness probe; bind it to loopback or put it behind an authenticated private gateway.
+- Query endpoints have no authentication or rate limiting. There is no distributed tracing
+  exporter; operator dependency probes are basic checks, not end-to-end readiness guarantees.
+  Bind to loopback or use an authenticated private gateway.
 - TaxGuide provides information from official evidence; it is not a substitute for professional
   tax advice or an eligibility determination.
 
@@ -231,6 +244,7 @@ contract and its remaining limitations.
 - [Open the app: frontend runbook](docs/frontend.md)
 - [HTTP API and observability](docs/api.md)
 - [Local runtime and hardware](docs/local-runtime.md)
+- [Connections and local-service controls](docs/runtime-management.md)
 - [Desktop, laptop, and Oracle deployment](docs/three-machine-deployment.md)
 - [Grounded generation status](docs/generation.md)
 - [Crawler](docs/crawler.md)

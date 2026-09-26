@@ -1,6 +1,7 @@
 """FastAPI boundary for independent retrieval, reranking, and grounded answers."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
 from os import environ
 from pathlib import Path
@@ -9,6 +10,7 @@ from time import perf_counter
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
+from taxguide.api.admin import admin_router
 from taxguide.api.backend import ApiBackend, ConfiguredBackend
 from taxguide.api.models import (
     QueryRequest,
@@ -33,6 +35,7 @@ from taxguide.observability.request import (
     trace_scope,
 )
 from taxguide.retrieval.factory import RetrievalMode
+from taxguide.runtime.controller import RuntimeController, from_environment
 
 
 def _settings() -> AppConfig:
@@ -58,6 +61,7 @@ _LOGGABLE_PATHS = {
     "/v1/retrieve",
     "/v1/rerank",
     "/v1/query",
+    "/v1/admin",
     "/openapi.json",
     "/docs",
     "/redoc",
@@ -70,13 +74,37 @@ def create_app(
     backend: ApiBackend | None = None,
     metrics: MetricsRegistry | None = None,
     clock: Callable[[], float] = perf_counter,
+    runtime: RuntimeController | None = None,
+    admin_token: str | None = None,
 ) -> FastAPI:
     """Compose a testable HTTP boundary without loading models or contacting Qdrant."""
     config = settings or _settings()
     service = backend or ConfiguredBackend(config)
+    token = admin_token if admin_token is not None else environ.get("TAXGUIDE_ADMIN_TOKEN")
+    if token and len(token) < 32:
+        raise ValueError("TAXGUIDE_ADMIN_TOKEN must contain at least 32 characters")
+    controller = runtime
+    if controller is None and token and backend is None:
+        controller = from_environment(config)
+
+    def active() -> tuple[AppConfig, ApiBackend]:
+        return controller.snapshot() if controller is not None else (config, service)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        if controller is not None:
+            controller.store.acquire()
+        try:
+            yield
+        finally:
+            if controller is not None:
+                controller.supervisor.close()
+                controller.store.release()
+
     registry = metrics or MetricsRegistry()
     package_version = _version()
-    application = FastAPI(title="TaxGuide Norway API", version=package_version)
+    application = FastAPI(title="TaxGuide Norway API", version=package_version, lifespan=lifespan)
+    application.include_router(admin_router(controller, token))
 
     @application.middleware("http")
     async def observe_request(
@@ -123,8 +151,9 @@ def create_app(
 
     @application.post("/v1/retrieve", response_model=RetrieveResponse)
     def retrieve(payload: RetrieveRequest) -> RetrieveResponse:
-        mode = payload.mode or config.retrieval.default_mode
-        candidate_limit = payload.candidate_limit or config.retrieval.candidate_limit
+        current, current_service = active()
+        mode = payload.mode or current.retrieval.default_mode
+        candidate_limit = payload.candidate_limit or current.retrieval.candidate_limit
         if mode in {"reranked", "all"} and candidate_limit < payload.limit:
             raise HTTPException(422, "candidate_limit must be at least limit")
         try:
@@ -139,7 +168,7 @@ def create_app(
                     )
                     for stage_name, selected_mode in diagnostic_modes:
                         with timed_stage(f"retrieval_{stage_name}"):
-                            stages[stage_name] = service.retrieve(
+                            stages[stage_name] = current_service.retrieve(
                                 payload.query,
                                 mode=selected_mode,
                                 limit=payload.limit,
@@ -147,7 +176,7 @@ def create_app(
                                 tax_year=payload.tax_year,
                             )
                     return RetrieveResponse(mode="all", stages=stages)
-                results = service.retrieve(
+                results = current_service.retrieve(
                     payload.query,
                     mode=mode,
                     limit=payload.limit,
@@ -160,21 +189,23 @@ def create_app(
 
     @application.post("/v1/rerank", response_model=RerankResponse)
     def rerank(payload: RerankRequest) -> RerankResponse:
+        _, current_service = active()
         try:
             with timed_stage("reranking"):
-                results = service.rerank(payload.query, payload.chunks, limit=payload.limit)
+                results = current_service.rerank(payload.query, payload.chunks, limit=payload.limit)
         except (TaxguideError, RuntimeError, ValueError) as exc:
             raise _api_error(exc) from exc
         return RerankResponse(results=results)
 
     @application.post("/v1/query", response_model=GroundedRagResult)
     def query(payload: QueryRequest) -> GroundedRagResult | JSONResponse:
-        mode = payload.mode or config.retrieval.default_mode
-        candidate_limit = payload.candidate_limit or config.retrieval.candidate_limit
+        current, current_service = active()
+        mode = payload.mode or current.retrieval.default_mode
+        candidate_limit = payload.candidate_limit or current.retrieval.candidate_limit
         if mode == "reranked" and candidate_limit < payload.retrieval_limit:
             raise HTTPException(422, "candidate_limit must be at least retrieval_limit")
         try:
-            result = service.query(
+            result = current_service.query(
                 payload.question,
                 mode=mode,
                 retrieval_limit=payload.retrieval_limit,

@@ -1,0 +1,21 @@
+# Copy to local-services.yaml and replace paths/container name on the API host.
+# Trusted operator input only; never editable from the web UI.
+# Omit services which should remain externally managed.
+services:
+  embeddings:
+    executable: C:/tools/ollama/ollama.exe
+  generator:
+    executable: C:/tools/llama.cpp/llama-server.exe
+    model_path: C:/models/qwen3-4b-instruct-2507-q4_k_m.gguf
+    model_id: Qwen/Qwen3-4B-Instruct-2507
+    gpu_layers: 0
+    context_size: 4096
+  reranker:
+    executable: C:/tools/llama.cpp/llama-server.exe
+    model_path: C:/models/qwen3-reranker-0.6b-q8_0.gguf
+    model_id: Qwen/Qwen3-Reranker-0.6B
+    gpu_layers: 0
+    context_size: 4096
+  qdrant:
+    executable: C:/Program Files/Docker/Docker/resources/bin/docker.exe
+    container: taxnorwayrag-qdrant-1

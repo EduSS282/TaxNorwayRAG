@@ -2,7 +2,9 @@
 
 TaxGuide's FastAPI process is a thin boundary over the existing retrieval, reranking, and
 grounded-generation contracts. Install with `uv sync --locked` and start Qdrant plus the model
-services required by the selected mode. The API does not download models or start services.
+services required by the selected mode. Administration never downloads models (the optional
+in-process sentence-transformers providers may fetch missing weights on first inference). Optional authenticated
+administration can start preconfigured services on the API host; see [runtime management](runtime-management.md).
 
 Start from the repository root, bound to loopback:
 
@@ -33,6 +35,7 @@ connection errors are returned as service-unavailable responses, without downstr
 | `GET /v1/health` | none | Liveness status only |
 | `GET /v1/version` | none | Package and API version |
 | `GET /v1/metrics` | none | Per-process aggregate latency seconds by stage |
+| `POST /v1/admin` | Operator action and bearer key | Connections, dependency states, owned processes and lifecycle events |
 
 The default mode comes from `retrieval.default_mode` (`dense` in the base config); `sparse`,
 `hybrid`, and `reranked` are also accepted. `mode: "all"` is a diagnostic option that runs all
@@ -68,6 +71,28 @@ response that retains the trace ID. Clarification and abstention are
 structured successful outcomes rather than transport failures. `/v1/health` intentionally does
 not test external dependencies, so it is not a readiness guarantee.
 
+## Operator administration
+
+Disabled by default (503). Set `TAXGUIDE_ADMIN_TOKEN` to a secret of at least 32 characters and
+optionally configure `TAXGUIDE_SERVICE_ORIGINS`, `TAXGUIDE_CONNECTIONS_FILE`, and
+`TAXGUIDE_LOCAL_SERVICES` as described in the runtime guide. Run exactly one API worker.
+Use `Authorization: Bearer <operator-key>`; invalid keys return 401, direct browser `Origin`
+headers return 403. Browser requests must use the same-origin Next.js `/api/admin` proxy.
+
+Actions are `get`, `check`, `save`, `restore`, `start`, `stop`, and `prepare`. `check` accepts
+optional draft `connections` without persisting them. `save` takes all connection fields plus
+the current `revision`; `restore`, `start`, `stop`, and `prepare` also require that revision.
+Process actions use a closed `service` name (`generator`, `embeddings`, `reranker`, `qdrant`);
+`stop` requires `confirm_stop: true`. `prepare` accepts the retrieval `mode` and advances through
+its dependencies until one is not ready. It does not poll or infer/download missing models.
+
+The response contains `connections`, `revision`, `can_restore`, `allowed_origins`,
+`local_services`, `services`, and bounded `events`; draft checks also return `checks`.
+`ready` is independent of process ownership. Save conflicts, owned-process configuration changes,
+and stale revisions return 409; invalid destinations/inputs return 422; process/runtime failures
+return sanitized 503 errors. Responses are not cached. Changing embedding identity requires a
+different collection and `confirm_reindex: true`; indexing itself is a separate CLI operation.
+
 ## Logging, metrics, and tracing
 
 Each HTTP request emits one JSON log record with method, path, status, duration, request ID, trace
@@ -79,8 +104,10 @@ fixed-bucket counts for HTTP requests and the retrieval, reranking, and generati
 are in memory, per process, and reset on restart. Trace spans are logged, not retained in a
 searchable backend or propagated to Qdrant/model HTTP calls. OpenTelemetry export is deferred.
 
-The API has no authentication, rate limiting, CORS policy for browser clients, or TLS termination.
+Only `/v1/admin` has operator authentication. Query/retrieval endpoints have no authentication,
+rate limiting, CORS policy for browser clients, or TLS termination.
 Do not expose it directly to the public Internet; use loopback, a private tunnel, or an
 authenticated gateway. Run one worker on constrained local hardware unless measured otherwise:
 each worker has its own cached adapters and metrics. The [frontend](frontend.md) uses a server-side
-proxy, so browser CORS is not needed. Neither process orchestrates external model services.
+proxy, so browser CORS is not needed. Optional local supervision does not provide remote execution
+or make public exposure safe.

@@ -1,5 +1,6 @@
 export const labels = {
   en: {
+    settings: "Connections & services",
     finalContext: "Final context selected for this answer",
     includeContext: "Include final context in the answer",
     eyebrow: "OFFICIAL EVIDENCE · LOCAL WORKSPACE",
@@ -39,6 +40,7 @@ export const labels = {
     yearNote: "Selecting a year does not guarantee that it is indexed.",
   },
   nb: {
+    settings: "Tilkoblinger og tjenester",
     finalContext: "Endelig kontekst valgt for dette svaret",
     includeContext: "Inkluder endelig kontekst i svaret",
     eyebrow: "OFFISIELLE KILDER · LOKALT ARBEIDSOMRÅDE",
@@ -78,6 +80,7 @@ export const labels = {
     yearNote: "Et valgt år er ikke nødvendigvis indeksert.",
   },
   es: {
+    settings: "Conexiones y servicios",
     finalContext: "Contexto final seleccionado para esta respuesta",
     includeContext: "Incluir contexto final en la respuesta",
     eyebrow: "FUENTES OFICIALES · ESPACIO LOCAL",

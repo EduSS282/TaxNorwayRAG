@@ -88,6 +88,7 @@ export function TaxGuide() {
           <span className="brand-mark">T</span> TaxGuide <span>Norway</span>
         </a>
         <span className="version">RESEARCH PREVIEW · v0.9</span>
+        <a href="/settings">{text.settings}</a>
       </header>
       <main>
         <div className="intro">

@@ -4,6 +4,9 @@
 
 Accepted.
 
+Follow-up: [ADR 0011](0011-operator-connections-and-local-services.md) adds authenticated
+operator administration. The original query endpoints remain unauthenticated.
+
 ## Context
 
 The grounded CLI already composed retrieval, reranking, and generation services. A new HTTP

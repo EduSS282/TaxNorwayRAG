@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// Fixed destinations only: no arbitrary URL, cookies, credentials or headers forwarded.
+// Fixed destinations only; admin credentials are forwarded solely to /v1/admin.
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ operation: string }> },
 ) {
   const { operation } = await context.params;
-  if (operation !== "query" && operation !== "retrieve") {
+  if (!["query", "retrieve", "admin"].includes(operation)) {
     return NextResponse.json({ detail: "Unknown operation" }, { status: 404 });
   }
   const headers = { "Cache-Control": "no-store" };
@@ -57,7 +57,12 @@ export async function POST(
       throw new Error("Invalid configuration");
     const upstream = await fetch(new URL(`/v1/${operation}`, base), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(operation === "admin"
+          ? { Authorization: request.headers.get("authorization") || "" }
+          : {}),
+      },
       body,
       cache: "no-store",
       redirect: "error",

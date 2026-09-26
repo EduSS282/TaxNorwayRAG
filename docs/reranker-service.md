@@ -52,9 +52,10 @@ the original chunk before applying the requested final CLI limit. Scores are ret
 TaxGuide laptop → localhost:8001 → SSH tunnel → remote llama-server → reranker GGUF
 ```
 
-`llama-server` must already be running with reranking enabled. TaxGuide does not start it,
-download models, create SSH tunnels, manage its process, or manage remote infrastructure. This
-provider does not load `sentence-transformers` or local model weights.
+`llama-server` must be running with reranking enabled before inference. Optional
+[operator controls](runtime-management.md) can start a preconfigured local GGUF process on the API
+host. Remote startup, model downloads and SSH tunnels remain manual. The HTTP adapter itself does
+not load `sentence-transformers` or local model weights.
 
 For the configured 0.6B model, a CPU-first development command is:
 

@@ -27,6 +27,14 @@ createServer(async (request, response) => {
   let body = "";
   for await (const part of request) body += part;
   const payload = JSON.parse(body);
+  if (request.url === "/v1/admin")
+    return response.end(
+      JSON.stringify({
+        authorization: request.headers.authorization || null,
+        cookie: request.headers.cookie || null,
+        origin: request.headers.origin || null,
+      }),
+    );
   const question = payload.question || payload.query;
   if (question === "unavailable") {
     response.statusCode = 503;
@@ -35,7 +43,11 @@ createServer(async (request, response) => {
   if (question === "bad-json") return response.end("not JSON");
   if (question === "echo")
     return response.end(
-      JSON.stringify({ payload, cookie: request.headers.cookie || null }),
+      JSON.stringify({
+        payload,
+        cookie: request.headers.cookie || null,
+        authorization: request.headers.authorization || null,
+      }),
     );
   if (question === "slow")
     await new Promise((resolve) => setTimeout(resolve, 600));

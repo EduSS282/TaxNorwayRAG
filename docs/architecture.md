@@ -8,8 +8,9 @@ not mean they are implemented.
 
 TaxGuide owns deterministic acquisition, document processing, retrieval composition, tax-aware
 routing, and grounded-generation contracts. Qdrant, Ollama, llama.cpp, and optional HTTP model
-services are separate processes. TaxGuide connects to them but does not install models, start
-services, create tunnels, or manage their lifecycle.
+services are separate processes. TaxGuide does not install models or create tunnels. An opt-in
+operator boundary can supervise preconfigured local services on the API host; remote services
+remain externally managed.
 
 The current CLI boundary includes grounded generation:
 
@@ -22,9 +23,9 @@ taxguide answer   → validated answer, clarification, abstention, or failure
 
 The FastAPI boundary exposes retrieval, reranking, and grounded answers through separate endpoints.
 It composes existing application services and adds request-scoped trace IDs, JSON access logs, and
-process-local latency metrics. It does not start external services or load model weights at import.
+process-local latency metrics. It does not start services or load model weights at import.
 The Next.js App Router frontend is a separate Node process. The browser posts only to its
-same-origin `/api/query` and `/api/retrieve` handlers, which forward JSON to a fixed server-side
+same-origin `/api/query`, `/api/retrieve`, and `/api/admin` handlers, which forward JSON to a fixed server-side
 `TAXGUIDE_API_URL`. No Python/domain code is duplicated in the frontend. There is no authenticated
 public deployment. See [API](api.md), [frontend](frontend.md), ADR 0009 and ADR 0010.
 
@@ -39,6 +40,26 @@ corpus filters or evidence. `include_context` exposes the real bounded `Generati
 developer inspection; it is off by default. Diagnostic retrieval compares four independent
 retrieval runs, not intermediate stages captured from the same generated answer. The final-context
 panel, in contrast, belongs to the actual answer request, including its source IDs.
+
+## Operator runtime boundary
+
+`runtime/` owns validated connection snapshots, atomic current/previous settings persistence,
+bounded dependency probes, and a supervisor with injected process interfaces. `/v1/admin` requires
+an explicitly configured operator key and rejects direct browser-origin requests. The Next.js
+proxy forwards the key only for administration. Destinations must match an operator-defined
+origin allowlist; executable paths and GGUF identity are trusted file configuration, never HTTP input.
+
+Saving settings rebuilds the API backend and publishes a paired configuration/backend snapshot;
+in-flight queries retain their original pair. CLI YAML configuration is unchanged. A settings-file
+lock enforces one managing worker. Embedding identity changes require a new collection and explicit
+reindex confirmation. This guard does not perform or verify reindexing.
+
+The supervisor starts only fixed Ollama/llama.cpp commands or an existing stopped local Docker
+container. It does not adopt processes already using an endpoint, and only stops owned instances.
+Managed embeddings use CPU; concurrent owned GPU profiles are refused. Probes do not load weights,
+and preparation advances only through dependencies ready at that moment. Remote control, model
+downloads, durable daemon supervision, and public query authentication remain out of scope.
+See [runtime management](runtime-management.md) and ADR 0011.
 
 ## Offline pipeline
 
@@ -204,7 +225,7 @@ The grounded CLI milestone is complete, but these gaps remain:
 3. count complete rendered prompt tokens rather than only chunk tokens;
 4. add a copied quote or claim mapping if exact semantic quote validation is required;
 5. enrich corpus topic/audience metadata before applying every router filter to retrieval;
-6. add authenticated public API deployment, distributed telemetry export, and service supervision;
+6. add authenticated public API deployment, distributed telemetry export, and durable/remote supervision;
 7. execute and record the existing opt-in live smoke test on the target hardware and corpus.
 8. add safe candidate collection cleanup and richer immutable evaluation provenance (model/runtime
    revisions and hardware manifest).

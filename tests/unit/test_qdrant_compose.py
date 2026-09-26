@@ -8,5 +8,6 @@ def test_compose_file_defines_a_persistent_local_qdrant_service() -> None:
 
     qdrant = compose["services"]["qdrant"]
     assert qdrant["image"].startswith("qdrant/qdrant:")
-    assert "6333:6333" in qdrant["ports"]
+    assert "127.0.0.1:6333:6333" in qdrant["ports"]
+    assert "127.0.0.1:6334:6334" in qdrant["ports"]
     assert "./data/qdrant:/qdrant/storage" in qdrant["volumes"]
