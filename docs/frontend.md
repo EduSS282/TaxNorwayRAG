@@ -61,6 +61,9 @@ API escuchan en loopback; las consultas siguen sin autenticación. Para sobremes
   idioma al generador. No traduce las fuentes ni filtra el corpus por idioma. Los mensajes
   deterministas de aclaración/abstención pueden seguir en inglés; no se verifica la traducción.
 - Pulsa «Buscar respuesta». La interfaz diferencia respuesta, aclaración, abstención y error.
+  Si `routing.classification.intent` es `uncertain`, pide aclarar el ámbito fiscal sin ejecutar
+  retrieval ni generación; elegir un año no elimina esa ambigüedad. Es un nuevo valor del enum
+  HTTP, no un nuevo estado visual. El inspector sigue siendo una búsqueda independiente.
   Las citas muestran ID, título, URL original y chunk; solo HTTP(S) se convierte en enlace.
   La confianza es del modelo, no una probabilidad calibrada de exactitud.
 - Al editar pregunta, año, idioma o controles del inspector se borran resultados anteriores para

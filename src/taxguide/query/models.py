@@ -15,6 +15,7 @@ class QueryIntent(StrEnum):
     DOCUMENT_REQUIRED = "document_required"
     GENERAL_EXPLANATION = "general_explanation"
     OUT_OF_SCOPE = "out_of_scope"
+    UNCERTAIN = "uncertain"
 
 
 class RiskLevel(StrEnum):

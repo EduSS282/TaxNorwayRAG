@@ -23,6 +23,8 @@ local question interface, cited sources, tax-year/language controls, and a devel
 - strict pre-ranking tax-year filters and cross-year result validation;
 - explicit annual-rate crawling (`--year`), checked against the fetched official year selector;
 - deterministic topic, intent, risk, and route classification;
+- multilingual deterministic routing with explicit uncertain-scope clarification and independent
+  eligibility/amount risk checks; see [routing](docs/routing.md);
 - automatic creation and schema validation of the Qdrant collection during indexed corpus builds;
 - incremental indexing that verifies chunk identities, content hashes, and index settings,
   retires obsolete document points, and supports candidate promotion/rollback through Qdrant aliases;

@@ -115,6 +115,20 @@ class DeterministicTaxRouter:
                 reason="The query is outside the supported Norwegian individual-tax scope.",
             )
 
+        if classification.intent is QueryIntent.UNCERTAIN:
+            return RoutingDecision(
+                action=RouteAction.CLARIFY,
+                classification=classification,
+                risk=risk,
+                filters=filters,
+                requires_tax_year=False,
+                minimum_evidence=minimum_evidence,
+                clarification_questions=(
+                    "Could you clarify the Norwegian individual-tax issue you want help with?",
+                ),
+                reason="The wording does not establish a supported tax question; clarify scope.",
+            )
+
         if requires_tax_year and tax_year is None:
             return RoutingDecision(
                 action=RouteAction.CLARIFY,

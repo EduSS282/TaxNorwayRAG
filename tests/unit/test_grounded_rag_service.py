@@ -109,6 +109,54 @@ def test_context_not_fabricated_when_routing_clarifies() -> None:
     assert result.final_context is None
 
 
+@pytest.mark.parametrize("tax_year", [None, 2026])
+def test_uncertain_scope_clarifies_without_retrieval_or_generation(tax_year) -> None:
+    retriever = RecordingRetriever([])
+    generator = StubGenerator("must not run")
+    result = _service(retriever, generator).answer(
+        "Which NGO should I support?", tax_year=tax_year, include_context=True
+    )
+    assert result.status is GroundedRagStatus.CLARIFICATION_REQUIRED
+    assert result.routing.classification.intent.value == "uncertain"
+    assert result.clarification_questions
+    assert result.answer is None and result.final_context is None
+    assert not retriever.calls and not generator.calls
+
+
+def test_original_donation_question_reaches_year_filtered_retrieval() -> None:
+    retriever = RecordingRetriever([])
+    generator = StubGenerator("must not run without evidence")
+    result = _service(retriever, generator).answer(
+        "Can donations to NGOs deductible?", tax_year=2026
+    )
+    assert result.routing.classification.intent.value == "eligibility"
+    assert result.routing.action.value == "retrieve"
+    assert retriever.calls == [
+        ("Can donations to NGOs deductible?", 5, RetrievalFilter(tax_year=2026))
+    ]
+    assert result.status is GroundedRagStatus.ABSTAINED
+    assert not generator.calls
+
+
+def test_uncertain_intent_is_exposed_through_existing_http_clarification_contract(
+    monkeypatch,
+) -> None:
+    retriever = RecordingRetriever([])
+    generator = StubGenerator("must not run")
+    service = _service(retriever, generator)
+    monkeypatch.setattr("taxguide.api.backend.build_grounded_service", lambda *a, **kw: service)
+    with TestClient(create_app(settings=AppConfig())) as client:
+        response = client.post("/v1/query", json={"question": "Which NGO should I support?"})
+        schema = client.get("/openapi.json").json()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "clarification_required"
+    assert payload["routing"]["classification"]["intent"] == "uncertain"
+    assert payload["clarification_questions"]
+    assert "uncertain" in schema["components"]["schemas"]["QueryIntent"]["enum"]
+    assert not retriever.calls and not generator.calls
+
+
 @pytest.mark.parametrize("language", ["en", "nb", "es"])
 def test_http_options_reach_configured_answer_service(monkeypatch, language) -> None:
     chunk = _chunk("a", tax_year=2026)

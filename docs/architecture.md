@@ -153,6 +153,11 @@ The routing layer is independent from the retrieval CLI and generation component
 
 The router does not infer residency, eligibility, or a missing tax year, and it does not generate
 tax advice. High-risk or year-sensitive questions without a resolved year require clarification.
+Unknown/ambiguous scope uses the `uncertain` intent and asks a scope question without retrieval,
+even if a year was supplied. Generic topic words alone do not establish fiscal scope. Shared
+literal normalization and curated EN/NO/ES aliases recognize common variants; eligibility and
+quantitative risk are checked independently of primary intent priority. See
+[routing](routing.md) and [ADR 0013](adr/0013-uncertain-deterministic-routing.md).
 `taxguide answer` composes the router before retrieval. The lower-level `taxguide retrieve` command
 continues to apply temporal resolution and caller-supplied filters directly, without intent/risk
 routing.

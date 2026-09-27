@@ -13,6 +13,7 @@ from taxguide.query.risk import RuleBasedRiskClassifier
         (QueryIntent.HOW_TO_REPORT, RiskLevel.MEDIUM),
         (QueryIntent.ELIGIBILITY, RiskLevel.HIGH),
         (QueryIntent.OUT_OF_SCOPE, RiskLevel.HIGH),
+        (QueryIntent.UNCERTAIN, RiskLevel.HIGH),
     ],
 )
 def test_risk_classifier_uses_explicit_intent_mapping(

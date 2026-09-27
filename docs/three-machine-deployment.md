@@ -159,6 +159,12 @@ No cambies a un modelo generativo mayor hasta medir latencia, RAM y VRAM con el 
 
 ### 5. Construir el corpus y responder
 
+Los cambios del clasificador determinista sólo requieren reiniciar la API, no reindexar ni
+reiniciar el LLM del sobremesa. `uncertain` solicita aclarar el ámbito fiscal incluso con año
+seleccionado. Las variantes de deducibilidad EN/NO/ES ya reconocidas siguen exigiendo año y
+evidencia cuando corresponde; consulta [routing](routing.md). Los tests del clasificador/UI son
+deterministas y no sustituyen la evaluación con modelos y fuentes reales.
+
 Para preguntas de importes por año, añade fuentes anuales con la
 [guía de corpus 2025/2026](annual-corpus.md): el crawl general siguiente no garantiza años.
 En el portátil, `configs/base.yaml` usa `127.0.0.1` para Qdrant/Ollama locales; evita la espera

@@ -1,12 +1,13 @@
 """Controlled vocabulary for Norwegian individual-tax topics."""
 
-import re
 from collections.abc import Mapping, Sequence
 
 from pydantic import field_validator
 
 from taxguide.domain.enums import TaxTopic
 from taxguide.domain.models import DomainModel
+from taxguide.domain.text_matching import contains_term as _contains_term
+from taxguide.domain.text_matching import normalize_query as _normalize
 
 
 class TopicMatch(DomainModel):
@@ -24,28 +25,65 @@ class TopicMatch(DomainModel):
 
 
 DEFAULT_TOPIC_ALIASES: Mapping[TaxTopic, tuple[str, ...]] = {
-    TaxTopic.INCOME: ("income", "taxable income", "inntekt", "ingresos", "renta"),
+    TaxTopic.INCOME: (
+        "income",
+        "taxable income",
+        "inntekt",
+        "inntekter",
+        "ingreso",
+        "ingresos",
+        "renta",
+    ),
     TaxTopic.EMPLOYMENT: (
         "employment",
         "salary",
+        "salaries",
         "wages",
         "arbeid",
         "lønn",
         "empleo",
         "salario",
+        "salarios",
     ),
-    TaxTopic.PENSION: ("pension", "pensjon", "pensión"),
-    TaxTopic.BANK: ("bank", "bank account", "bankkonto", "cuenta bancaria"),
-    TaxTopic.LOAN: ("loan", "interest expense", "lån", "gjeld", "préstamo", "hipoteca"),
+    TaxTopic.PENSION: ("pension", "pensions", "pensjon", "pensjoner", "pensión", "pensiones"),
+    TaxTopic.BANK: (
+        "bank",
+        "banks",
+        "bank account",
+        "bank accounts",
+        "bankkonto",
+        "bankkontoer",
+        "cuenta bancaria",
+        "cuentas bancarias",
+    ),
+    TaxTopic.LOAN: (
+        "loan",
+        "loans",
+        "mortgage",
+        "mortgages",
+        "interest expense",
+        "loan interest",
+        "lån",
+        "gjeld",
+        "gjeldsrenter",
+        "préstamo",
+        "préstamos",
+        "hipoteca",
+        "hipotecas",
+    ),
     TaxTopic.WEALTH: ("wealth", "net wealth", "formue", "patrimonio"),
     TaxTopic.PROPERTY: (
         "property",
+        "properties",
         "real estate",
         "home",
         "bolig",
         "eiendom",
         "inmueble",
         "vivienda",
+        "viviendas",
+        "rental income",
+        "leieinntekter",
     ),
     TaxTopic.FOREIGN_INCOME: (
         "foreign income",
@@ -59,25 +97,51 @@ DEFAULT_TOPIC_ALIASES: Mapping[TaxTopic, tuple[str, ...]] = {
         "foreign assets",
         "assets abroad",
         "foreign bank account",
+        "foreign bank accounts",
         "utenlandske eiendeler",
         "formue i utlandet",
         "utenlandsk bankkonto",
         "activos extranjeros",
         "bienes en el extranjero",
         "cuenta bancaria extranjera",
+        "cuentas bancarias extranjeras",
     ),
     TaxTopic.DEDUCTIONS: (
         "deduction",
         "deductions",
         "deduct",
+        "deductible",
+        "deductable",
+        "deducted",
+        "deductibility",
+        "tax relief",
+        "tax credit",
+        "tax credits",
+        "personal allowance",
+        "standard deduction",
+        "personfradrag",
+        "personfradraget",
+        "minstefradraget",
         "fradrag",
+        "fradraget",
+        "fradragene",
+        "fradragsberettiget",
+        "fradragsberettigede",
+        "fradragsrett",
+        "minstefradrag",
         "deducción",
         "deducciones",
         "deducir",
+        "deducible",
+        "deducibles",
+        "desgravar",
+        "desgravación",
+        "desgravaciones",
     ),
     TaxTopic.COMMUTING: (
         "commuting",
         "commuter",
+        "commuters",
         "travel to work",
         "pendler",
         "arbeidsreise",
@@ -86,19 +150,34 @@ DEFAULT_TOPIC_ALIASES: Mapping[TaxTopic, tuple[str, ...]] = {
     TaxTopic.FAMILY: (
         "family",
         "childcare",
+        "child care",
         "parental deduction",
         "familie",
         "foreldrefradrag",
         "familia",
         "guardería",
+        "guarderías",
     ),
-    TaxTopic.SHARES: ("shares", "stocks", "dividend", "aksjer", "utbytte", "acciones"),
+    TaxTopic.SHARES: (
+        "shares",
+        "stocks",
+        "dividend",
+        "dividends",
+        "capital gains",
+        "aksjer",
+        "utbytte",
+        "acciones",
+        "dividendos",
+        "ganancias patrimoniales",
+    ),
     TaxTopic.CRYPTO: (
         "crypto",
         "cryptocurrency",
+        "cryptocurrencies",
         "bitcoin",
         "kryptovaluta",
         "criptomoneda",
+        "criptomonedas",
     ),
     TaxTopic.SELF_EMPLOYED: (
         "self-employed",
@@ -107,6 +186,7 @@ DEFAULT_TOPIC_ALIASES: Mapping[TaxTopic, tuple[str, ...]] = {
         "næringsdrivende",
         "enkeltpersonforetak",
         "autónomo",
+        "autónomos",
         "trabajador por cuenta propia",
     ),
     TaxTopic.PAYE: ("paye", "pay as you earn", "kildeskatt på lønn", "retención paye"),
@@ -121,17 +201,22 @@ DEFAULT_TOPIC_ALIASES: Mapping[TaxTopic, tuple[str, ...]] = {
     ),
     TaxTopic.DEADLINES: (
         "deadline",
+        "deadlines",
         "due date",
         "filing date",
         "frist",
+        "fristen",
+        "frister",
         "fecha límite",
         "plazo",
     ),
     TaxTopic.APPEALS: (
         "appeal",
+        "appeals",
         "complaint",
         "challenge a decision",
         "klage",
+        "klager",
         "recurso",
         "reclamación",
     ),
@@ -184,11 +269,3 @@ class ControlledTaxonomy:
                 topics.append(topic)
                 matched_terms.extend(matches)
         return TopicMatch(topics=tuple(topics), matched_terms=tuple(matched_terms))
-
-
-def _normalize(value: str) -> str:
-    return " ".join(value.casefold().split())
-
-
-def _contains_term(text: str, term: str) -> bool:
-    return re.search(rf"(?<!\w){re.escape(term)}(?!\w)", text, flags=re.UNICODE) is not None

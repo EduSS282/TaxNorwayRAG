@@ -53,6 +53,13 @@ abstention remain English. `include_context: true` returns the actual bounded ev
 is null. It is also null if routing/retrieval ended before context construction. An empty
 constructed context has an empty evidence list. This is opt-in response data, never an access log.
 
+`routing.classification.intent` also accepts `uncertain`: the deterministic router could not
+establish a supported tax question from the wording. This returns HTTP 200 with
+`status: "clarification_required"` and scope-oriented `clarification_questions`, without retrieval
+or generation. A supplied year does not bypass this decision. Clients with exhaustive intent
+enums must support this value. `/v1/retrieve` remains an independent diagnostic path, not evidence
+that the answer route ran retrieval. See [routing](routing.md).
+
 Example (PowerShell):
 
 ```powershell
