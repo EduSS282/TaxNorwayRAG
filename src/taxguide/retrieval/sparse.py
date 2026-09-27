@@ -14,7 +14,7 @@ _TOKEN = re.compile(r"\w+", re.UNICODE)
 class SparseRetriever:
     """Rank a fixed chunk corpus with BM25 without an external search engine."""
 
-    def __init__(self, chunks: list[Chunk], *, k1: float = 1.5, b: float = 0.75) -> None:
+    def __init__(self, chunks: list[Chunk], *, k1: float = 1.5, b: float = 0.25) -> None:
         if k1 <= 0 or not 0 <= b <= 1:
             raise ValueError("k1 must be positive and b must be between zero and one")
         self._chunks = chunks
