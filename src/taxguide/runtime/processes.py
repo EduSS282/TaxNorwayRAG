@@ -40,7 +40,9 @@ def port_open(url: str) -> bool:
 
 
 def _flags() -> int:
-    return subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+    if sys.platform == "win32":
+        return subprocess.CREATE_NO_WINDOW
+    return 0
 
 
 class ChildHandle:

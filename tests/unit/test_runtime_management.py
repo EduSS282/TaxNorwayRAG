@@ -13,11 +13,30 @@ from taxguide.config.models import AppConfig
 from taxguide.runtime.controller import AdminRequest, ConflictError, RuntimeController
 from taxguide.runtime.models import Connections, LaunchProfile, LocalProfiles, ServiceStatus
 from taxguide.runtime.probes import check
-from taxguide.runtime.processes import ChildHandle, DockerHandle, LocalLauncher, local_endpoint
+from taxguide.runtime.processes import (
+    ChildHandle,
+    DockerHandle,
+    LocalLauncher,
+    _flags,
+    local_endpoint,
+)
 from taxguide.runtime.storage import SettingsStore
 from taxguide.runtime.supervisor import Supervisor
 
 TOKEN = "test-only-administration-key-0123456789"
+
+
+@pytest.mark.parametrize("platform", ["linux", "darwin"])
+def test_process_flags_without_windows_constant(monkeypatch, platform):
+    monkeypatch.setattr("taxguide.runtime.processes.sys.platform", platform)
+    monkeypatch.delattr(subprocess, "CREATE_NO_WINDOW", raising=False)
+    assert _flags() == 0
+
+
+def test_process_flags_hide_windows_console(monkeypatch):
+    monkeypatch.setattr("taxguide.runtime.processes.sys.platform", "win32")
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    assert _flags() == 0x08000000
 
 
 class FakeHandle:
