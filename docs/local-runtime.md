@@ -7,6 +7,10 @@ For the complete three-machine runbook, including the laptop reranker, Oracle sc
 SSH tunnels, configuration overlays, and startup order, see
 [three-machine deployment](three-machine-deployment.md).
 
+For verified 2025/2026 rate ingestion and diagnosing slow corpus builds, see
+[annual corpus](annual-corpus.md). The base YAML uses explicit IPv4 loopback for Qdrant and Ollama;
+this avoids a measured per-request localhost fallback delay on the Windows laptop.
+
 ## Recommended allocation
 
 | Machine | Primary responsibilities | Avoid as a required dependency |

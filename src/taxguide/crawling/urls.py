@@ -1,3 +1,5 @@
+import json
+import re
 from collections.abc import Iterable
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
@@ -77,8 +79,27 @@ def extract_links(html: str, base_url: str, allowed_hosts: Iterable[str]) -> lis
     tree = HTMLParser(html)
     links: list[str] = []
     seen: set[str] = set()
-    for anchor in tree.css("a[href]"):
-        href = (anchor.attributes.get("href") or "").strip()
+    hrefs = [(anchor.attributes.get("href") or "") for anchor in tree.css("a[href]")]
+    # The rate directory publishes its links as JSON, not rendered anchors.
+    # Decode only that known catalog; never execute JavaScript.
+    if urlsplit(base_url).path.rstrip("/").lower() in {"/en/rates", "/satser", "/nn/satser"}:
+        for script in tree.css("script"):
+            content = script.text()
+            match = re.search(r"\bvar\s+allthedata\s*=\s*", content)
+            if match is None:
+                continue
+            try:
+                catalog, _ = json.JSONDecoder().raw_decode(content[match.end() :])
+            except ValueError:
+                continue
+            if isinstance(catalog, list):
+                hrefs.extend(
+                    item["url"]
+                    for item in catalog
+                    if isinstance(item, dict) and isinstance(item.get("url"), str)
+                )
+    for href in hrefs:
+        href = href.strip()
         if not href or href.startswith("#"):
             continue
         try:

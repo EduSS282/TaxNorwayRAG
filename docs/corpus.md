@@ -33,7 +33,7 @@ Indexing requires the configured embedding service and Qdrant. The command creat
 single-vector cosine collection using the embedder's reported dimension and validates an existing
 collection before upsert; see [local Qdrant](qdrant-local.md). Repeated indexed builds parse and
 chunk the source, then compare exact chunk IDs, content hashes, and the parse/chunk/embed settings
-signature for `document_id + version_id`. This avoids re-embedding a complete matching version,
+signature plus tax-year metadata for `document_id + version_id`. This avoids re-embedding a complete matching version,
 detects partial earlier writes, and does not reuse vectors across collections or provide a
 persistent embedding cache. A successful write retires other points for the same document.
 
@@ -55,6 +55,16 @@ allowed Skatteetaten canonical URL, then final URL, then original URL.
 Non-dry runs write an immutable-per-execution report to
 `data/manifests/corpus/<run_id>.json`. It records filters, selected IDs, counts,
 timestamps, indexing configuration, and structured per-document failures.
+It also records `documents_by_tax_year` (successful and unchanged documents, with an `unknown`
+bucket) and `stage_seconds` (including time spent in failed attempts). These are stage totals,
+not per-document delays or a benchmark of answer quality. `--dry-run` only selects manifests;
+it does not verify the year against raw HTML. A normal build does.
+
+Annual source years must match the fetched official rate selector; URL parameters alone are not
+evidence. Old manifests without `tax_year` remain readable and the raw HTML is revalidated.
+Unverified annual artifacts fail ingestion without being indexed. This does not delete previously
+indexed bad data: use a clean candidate collection when repairing an older untrusted index.
+See [annual corpus workflow](annual-corpus.md) for PowerShell commands and performance diagnosis.
 
 Wizard pages can be excluded with `--exclude-wizards`; otherwise only their
 already-rendered static HTML enters the existing parser. The command does not

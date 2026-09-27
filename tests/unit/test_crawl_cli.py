@@ -102,3 +102,42 @@ def test_crawl_cli_named_source_rejects_out_of_scope_url(monkeypatch, tmp_path: 
     )
     assert result.exit_code == 1
     assert "outside allowed prefixes" in result.output
+
+
+def test_crawl_cli_accepts_repeatable_years(monkeypatch, tmp_path: Path) -> None:
+    crawl_module = importlib.import_module("taxguide.cli.crawl")
+
+    class AnnualHttp(CliHttpClient):
+        def fetch(self, url, *, before_request=None):
+            result = super().fetch(url, before_request=before_request)
+            if url.endswith("/robots.txt"):
+                return result
+            year = 2025 if "year=2025" in url else 2026
+            html = '<html lang="en"><main><p>Rate</p></main><select id="js-rateSelectedYear">'
+            for value in (2025, 2026):
+                selected = "selected" if value == year else ""
+                html += f'<option {selected} value="{value}">{value}</option>'
+            return HttpResponse(
+                url, 200, {"content-type": "text/html"}, (html + "</select></html>").encode()
+            )
+
+    monkeypatch.setattr(crawl_module, "SafeHttpClient", AnnualHttp)
+    result = CliRunner().invoke(
+        app,
+        [
+            "crawl",
+            f"{BASE}/en/rates/test/",
+            "--year",
+            "2025",
+            "--year",
+            "2026",
+            "--max-pages",
+            "3",
+            "--no-follow",
+            "--json",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert [page["tax_year"] for page in json.loads(result.stdout)["pages"]] == [None, 2025, 2026]

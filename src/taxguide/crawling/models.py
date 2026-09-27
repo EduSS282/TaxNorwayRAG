@@ -1,5 +1,6 @@
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
@@ -16,6 +17,7 @@ class CrawlRequest(CrawlModel):
     max_pages: int = Field(default=50, ge=1)
     max_depth: int = Field(default=2, ge=0)
     follow_links: bool = True
+    tax_years: tuple[Annotated[int, Field(ge=1900, le=2100)], ...] = ()
 
 
 class WizardMetadata(CrawlModel):
@@ -33,6 +35,7 @@ class SourceChangeStatus(StrEnum):
 
 
 class CrawledPage(CrawlModel):
+    tax_year: int | None = Field(default=None, ge=1900, le=2100)
     source_id: str | None = None
     original_url: str
     final_url: str

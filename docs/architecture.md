@@ -96,15 +96,23 @@ and temporal applicability where it is known.
   from another.
 - temporal metadata is copied into every chunk and persisted in the Qdrant payload.
 
-The corpus builder can derive a tax year from an explicit version URL. Missing temporal knowledge
-stays missing. See ADR 0004 for the versioning decision.
+The Skatteetaten parser requires both an explicit `?year=` URL and a matching selected option in
+the official rate selector before attaching a year. The crawler can discover requested annual
+variants from that selector (`--year`, repeatable), including rate URLs published as JSON in the
+rate directory. It never executes JavaScript. Mismatches fail closed before indexing; general
+pages retain unknown years. Existing captures are revalidated when parsed, not trusted solely
+because a manifest or URL has a year. See ADR 0004 and [ADR 0012](adr/0012-verified-annual-rates.md).
 
 Crawler manifests record content-change status against the previous saved manifest. During
-indexing, the corpus builder checks exact chunk IDs/content hashes and an index-settings signature,
+indexing, the corpus builder checks exact chunk IDs/content hashes, tax-year metadata, and an index-settings signature,
 skipping repeat embedding only when all match. Obsolete points for a document are removed after a
 complete current-version write. Physical candidate collections can be
 evaluated and promoted through stable Qdrant aliases, with one previous collection retained for rollback; see
 [index lifecycle](index-lifecycle.md) and ADR 0007.
+
+Corpus reports expose successful/unchanged document counts by verified year and elapsed time per
+stage (ingestion, chunking, index lookup, embedding, upsert, prune). The offline build has no
+per-document sleep. Crawler pacing is separate and continues to respect retries and robots rules.
 
 ## Retrieval pipeline
 

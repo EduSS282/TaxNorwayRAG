@@ -14,6 +14,8 @@ from taxguide.ingestion.hashing import document_id_from_url
 from taxguide.ingestion.normalizer import Normalizer
 from taxguide.ingestion.pipeline import IngestionPipeline
 from taxguide.ingestion.skatteetaten_parser import SkatteetatenHtmlParser
+from taxguide.retrieval.filters import RetrievalFilter
+from taxguide.retrieval.sparse import SparseRetriever
 from taxguide.sources.local import LocalHtmlSource
 from taxguide.vectorstores.qdrant import qdrant_point_id
 
@@ -220,8 +222,16 @@ def test_annual_versions_keep_distinct_identity_through_vector_indexing(tmp_path
         "d52d4518a194e0047294bbe0db60e9a14240c64ae9b639bbf95e79a70e5301be",
     ]
     html = "<html><main><h1>Deduction</h1><p>Annual tax content.</p></main></html>"
-    for item in manifests:
-        (tmp_path / f"{item.document_id}.html").write_text(html, encoding="utf-8")
+    for item, year in zip(manifests, [2025, 2026, None], strict=True):
+        selector = (
+            '<select id="js-rateSelectedYear">'
+            f'<option selected value="{year}">{year}</option></select>'
+            if year
+            else ""
+        )
+        (tmp_path / f"{item.document_id}.html").write_text(
+            html.replace("<main>", f"<main>{selector}"), encoding="utf-8"
+        )
 
     filters = CorpusFilters()
     selection = ManifestCorpusSelector().select(manifests, filters)
@@ -240,11 +250,53 @@ def test_annual_versions_keep_distinct_identity_through_vector_indexing(tmp_path
 
     chunks = [chunk for batch in store.batches for chunk in batch]
     assert report.processed == 3
+    assert report.documents_by_tax_year == {"2025": 1, "2026": 1, "unknown": 1}
+    assert set(report.stage_seconds) == {
+        "ingestion",
+        "chunking",
+        "index_lookup",
+        "embedding",
+        "index_upsert",
+        "index_prune",
+    }
+    assert all(value >= 0 for value in report.stage_seconds.values())
     assert {chunk.document_id for chunk in chunks} == {item.document_id for item in manifests}
     assert {chunk.metadata.source_url for chunk in chunks} == set(urls)
     assert {chunk.metadata.tax_year for chunk in chunks} == {2025, 2026, None}
     assert len({chunk.id for chunk in chunks}) == 3
     assert len({qdrant_point_id(chunk.id) for chunk in chunks}) == 3
+    for year in (2025, 2026):
+        results = SparseRetriever(chunks).retrieve(
+            "Annual tax content", filters=RetrievalFilter(tax_year=year)
+        )
+        assert len(results) == 1
+        assert results[0].chunk.metadata.source_url == f"{canonical}?year={year}"
+
+
+def test_legacy_url_year_without_evidence_is_not_indexed(tmp_path: Path) -> None:
+    item = make_manifest("unverified").model_copy(
+        update={
+            "final_url": "https://www.skatteetaten.no/en/rates/test/?year=2026",
+            "tax_year": 2026,
+        }
+    )
+    (tmp_path / f"{item.document_id}.html").write_text(
+        "<main><h1>Rate</h1><p>Mentions 2025 and 2026 but confirms neither.</p></main>",
+        encoding="utf-8",
+    )
+    store = RecordingStore()
+    report = CorpusBuilder(
+        pipeline, StructuralChunker(), embedder=MockEmbedder(), vector_store=store
+    ).build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    assert report.failed == 1 and report.processed == 0
+    assert report.documents_by_tax_year == {}
+    assert not store.batches
+    assert "not confirmed" in report.failures[0].message
 
 
 def test_run_report_is_persisted_separately_from_crawl_manifests(tmp_path: Path) -> None:

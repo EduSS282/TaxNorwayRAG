@@ -21,6 +21,7 @@ local question interface, cited sources, tax-year/language controls, and a devel
 - Qdrant indexing and dense retrieval;
 - in-memory BM25 sparse retrieval, reciprocal-rank fusion, and Qwen reranking;
 - strict pre-ranking tax-year filters and cross-year result validation;
+- explicit annual-rate crawling (`--year`), checked against the fetched official year selector;
 - deterministic topic, intent, risk, and route classification;
 - automatic creation and schema validation of the Qdrant collection during indexed corpus builds;
 - incremental indexing that verifies chunk identities, content hashes, and index settings,
@@ -79,6 +80,11 @@ uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --in
 ```
 
 Compare retrieval modes against the same indexed collection:
+
+For annual amounts, first acquire and index annual rate pages: ordinary guidance URLs usually
+have no verified tax year. Follow [annual corpus and build performance](docs/annual-corpus.md).
+Build reports include verified document-year counts and stage timings. Local Qdrant/Ollama use
+`127.0.0.1` in `configs/base.yaml` to avoid Windows localhost/IPv6 connection fallback delays.
 
 ```bash
 uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mode dense --limit 5

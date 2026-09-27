@@ -36,6 +36,11 @@ from taxguide.domain.exceptions import (
     UnsupportedContentTypeError,
 )
 from taxguide.ingestion.hashing import document_id_from_url
+from taxguide.ingestion.skatteetaten_years import (
+    annual_rate_urls,
+    tax_year_from_url,
+    verified_tax_year,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +96,9 @@ class SkatteetatenCrawler:
                 self._validate(response.url)
                 visited.add(normalize_url(response.url))
                 page = self._page(original_url, response, content_ids)
+                requested_year = tax_year_from_url(url)
+                if requested_year is not None and page.tax_year != requested_year:
+                    raise CrawlerError("Redirect did not preserve the requested tax year")
                 if self.allowed_languages and page.language not in self.allowed_languages:
                     skipped.append(url)
                     continue
@@ -129,6 +137,15 @@ class SkatteetatenCrawler:
                     )
                 )
                 continue
+            # Annual variants belong to the same page/depth, but count toward max_pages.
+            # Explicit --year expansion also works with --no-follow.
+            for link in reversed(
+                annual_rate_urls(page.raw_html, page.final_url, request.tax_years)
+            ):
+                self._validate(link)
+                if link not in queued:
+                    queued.add(link)
+                    queue.appendleft((link, link, depth))
             if request.follow_links and depth < request.max_depth:
                 for link in extract_links(page.raw_html, page.final_url, self.allowed_hosts):
                     try:
@@ -222,7 +239,12 @@ class SkatteetatenCrawler:
         # HTML canonical metadata is provenance, while the fetched final URL remains
         # the identity so two acquired aliases can never overwrite one another.
         document_id = document_id_from_url(final_url)
+        try:
+            tax_year = verified_tax_year(raw_html, final_url)
+        except ValueError as exc:
+            raise CrawlerError(str(exc)) from exc
         return CrawledPage(
+            tax_year=tax_year,
             source_id=self.source_id,
             original_url=original_url,
             final_url=final_url,

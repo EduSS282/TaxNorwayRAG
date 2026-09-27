@@ -167,12 +167,14 @@ class QdrantVectorStore:
                 if next_offset is None:
                     break
                 offset = next_offset
-            expected = {chunk.id: chunk.content_hash for chunk in expected_chunks}
+            expected = {chunk.id: chunk for chunk in expected_chunks}
             return len(found) == len(expected) and all(
                 chunk_id in found
-                and found[chunk_id].get("content_hash") == content_hash
+                and found[chunk_id].get("content_hash") == chunk.content_hash
+                and isinstance(found[chunk_id].get("metadata"), dict)
+                and found[chunk_id]["metadata"].get("tax_year") == chunk.metadata.tax_year
                 and found[chunk_id].get("_index_signature") == self._index_signature
-                for chunk_id, content_hash in expected.items()
+                for chunk_id, chunk in expected.items()
             )
         except Exception as exc:
             raise _qdrant_error(exc) from exc

@@ -1,8 +1,9 @@
 from collections.abc import Iterable
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
 from taxguide.corpus.models import CorpusFilters, CorpusSelection, CrawlManifest
 from taxguide.domain.enums import PageType
+from taxguide.ingestion.skatteetaten_years import tax_year_from_url
 
 DEFAULT_ALLOWED_HOSTS = frozenset({"www.skatteetaten.no", "skatteetaten.no"})
 
@@ -39,15 +40,6 @@ def source_version_url(
         ):
             return candidate
     return None
-
-
-def tax_year_from_url(url: str) -> int | None:
-    """Extract a single supported tax year from a source-version URL."""
-    values = parse_qs(urlsplit(url).query).get("year", [])
-    if len(values) != 1 or not values[0].isdigit():
-        return None
-    year = int(values[0])
-    return year if 1900 <= year <= 2100 else None
 
 
 def _normal_prefix(prefix: str) -> str:

@@ -1,6 +1,9 @@
-from collections.abc import Callable
+from collections import Counter
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from time import perf_counter
 from uuid import uuid4
 
 from taxguide.chunking.base import Chunker
@@ -11,7 +14,7 @@ from taxguide.corpus.models import (
     CorpusSelection,
     CrawlManifest,
 )
-from taxguide.corpus.selector import effective_url, source_version_url, tax_year_from_url
+from taxguide.corpus.selector import effective_url, source_version_url
 from taxguide.domain.exceptions import CorpusError, TaxguideError
 from taxguide.embeddings.base import Embedder
 from taxguide.ingestion.hashing import version_id_from_document
@@ -64,6 +67,8 @@ class CorpusBuilder:
         unchanged = 0
         chunks_generated = 0
         document_ids: list[str] = []
+        documents_by_tax_year: Counter[str] = Counter()
+        stage_seconds: dict[str, float] = {}
         for manifest in selection.manifests:
             url = source_version_url(manifest)
             if url is None:
@@ -80,7 +85,8 @@ class CorpusBuilder:
                 )
                 continue
             try:
-                document = self.pipeline_factory(manifest).ingest(path=path, source_url=url)
+                with _timed(stage_seconds, "ingestion"):
+                    document = self.pipeline_factory(manifest).ingest(path=path, source_url=url)
                 # The crawler ID represents the persisted capture. Keep it while
                 # carrying the exact source URL's temporal identity downstream.
                 document = document.model_copy(
@@ -89,39 +95,48 @@ class CorpusBuilder:
                         "version_id": version_id_from_document(
                             manifest.document_id, document.content_hash
                         ),
-                        "tax_year": tax_year_from_url(url),
                     }
                 )
-                chunks = self.chunker.chunk(document)
+                with _timed(stage_seconds, "chunking"):
+                    chunks = self.chunker.chunk(document)
             except (OSError, TaxguideError, ValueError) as exc:
                 failures.append(self._failure(manifest, "ingestion", exc))
                 continue
             if self.embedder is not None and self.vector_store is not None:
                 try:
-                    if self.vector_store.has_document_version(
-                        document_id=manifest.document_id,
-                        version_id=document.version_id,
-                        expected_chunks=chunks,
-                    ):
+                    with _timed(stage_seconds, "index_lookup"):
+                        matches = self.vector_store.has_document_version(
+                            document_id=manifest.document_id,
+                            version_id=document.version_id,
+                            expected_chunks=chunks,
+                        )
+                    if matches:
+                        with _timed(stage_seconds, "index_prune"):
+                            self.vector_store.prune_document_points(
+                                document_id=manifest.document_id,
+                                keep_chunk_ids=[chunk.id for chunk in chunks],
+                            )
+                        unchanged += 1
+                        documents_by_tax_year[str(document.tax_year or "unknown")] += 1
+                        continue
+                    for offset in range(0, len(chunks), self.embedding_batch_size):
+                        batch = chunks[offset : offset + self.embedding_batch_size]
+                        with _timed(stage_seconds, "embedding"):
+                            embeddings = self.embedder.embed_documents(
+                                [chunk.text for chunk in batch]
+                            )
+                        with _timed(stage_seconds, "index_upsert"):
+                            self.vector_store.upsert(batch, embeddings)
+                    with _timed(stage_seconds, "index_prune"):
                         self.vector_store.prune_document_points(
                             document_id=manifest.document_id,
                             keep_chunk_ids=[chunk.id for chunk in chunks],
                         )
-                        unchanged += 1
-                        continue
-                    for offset in range(0, len(chunks), self.embedding_batch_size):
-                        batch = chunks[offset : offset + self.embedding_batch_size]
-                        self.vector_store.upsert(
-                            batch, self.embedder.embed_documents([chunk.text for chunk in batch])
-                        )
-                    self.vector_store.prune_document_points(
-                        document_id=manifest.document_id,
-                        keep_chunk_ids=[chunk.id for chunk in chunks],
-                    )
                 except Exception as exc:
                     failures.append(self._failure(manifest, "index", exc))
                     continue
             processed += 1
+            documents_by_tax_year[str(document.tax_year or "unknown")] += 1
             chunks_generated += len(chunks)
             document_ids.append(manifest.document_id)
         completed_at = self.clock()
@@ -145,6 +160,8 @@ class CorpusBuilder:
             vector_collection=vector_collection if self.embedder is not None else None,
             document_ids=document_ids,
             failures=failures,
+            documents_by_tax_year=dict(documents_by_tax_year),
+            stage_seconds=stage_seconds,
         )
 
     @staticmethod
@@ -156,3 +173,12 @@ class CorpusBuilder:
             error_category=type(error).__name__,
             message=str(error),
         )
+
+
+@contextmanager
+def _timed(totals: dict[str, float], stage: str) -> Iterator[None]:
+    started = perf_counter()
+    try:
+        yield
+    finally:
+        totals[stage] = totals.get(stage, 0.0) + perf_counter() - started

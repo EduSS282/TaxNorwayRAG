@@ -7,6 +7,7 @@ from selectolax.parser import HTMLParser, Node
 from taxguide.domain.enums import ParagraphKind
 from taxguide.domain.exceptions import EmptyDocumentError, ParseError, UnsupportedDocumentError
 from taxguide.domain.models import Link, Paragraph, ParsedDocument, RawDocument, Section
+from taxguide.ingestion.skatteetaten_years import verified_tax_year
 
 logger = logging.getLogger(__name__)
 TEXT_NODE_SEPARATOR = "\ue000"
@@ -109,6 +110,7 @@ class SkatteetatenHtmlParser:
             raise ParseError(f"Cannot parse {document.local_path}: {exc}") from exc
 
     def _parse(self, document: RawDocument) -> ParsedDocument:
+        tax_year = verified_tax_year(document.content, document.source_url)
         tree = HTMLParser(document.content)
         html = tree.css_first("html")
         language = html.attributes.get("lang") if html else None
@@ -144,7 +146,7 @@ class SkatteetatenHtmlParser:
                 title = _text(h1) if h1 else fallback_title
                 identity = document.model_dump(exclude={"content", "content_type"})
                 parsed = ParsedDocument(
-                    **identity, title=title, language=language, sections=sections
+                    **identity, title=title, language=language, sections=sections, tax_year=tax_year
                 )
                 logger.info("document parsed id=%s sections=%d", document.id, len(sections))
                 return parsed

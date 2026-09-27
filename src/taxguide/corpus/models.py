@@ -13,6 +13,7 @@ class CorpusModel(BaseModel):
 
 
 class CrawlManifest(CorpusModel):
+    tax_year: int | None = Field(default=None, ge=1900, le=2100)
     source_id: str | None = None
     document_id: Digest
     original_url: str
@@ -70,6 +71,8 @@ class CorpusFailure(CorpusModel):
 
 
 class CorpusBuildReport(CorpusModel):
+    documents_by_tax_year: dict[str, int] = Field(default_factory=dict)
+    stage_seconds: dict[str, float] = Field(default_factory=dict)
     run_id: str
     started_at: AwareDatetime
     completed_at: AwareDatetime

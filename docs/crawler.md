@@ -31,6 +31,25 @@ capture manifest. `priority` is recorded policy metadata; crawl scheduling by pr
 implemented. URL-only crawls remain available and use the flat allowlists in `configs/base.yaml`.
 The source-policy YAML is distinct from the output JSON crawl manifests.
 
+For annual rates, use the bounded `skatteetaten-rates-en` source and repeatable `--year`:
+
+```console
+uv run taxguide crawl "https://www.skatteetaten.no/en/rates/minimum-standard-deduction/" --source skatteetaten-rates-en --year 2025 --year 2026 --no-follow --max-pages 3
+```
+
+The unversioned capture stays year-unknown. Only years advertised by that page's
+`select#js-rateSelectedYear` are queued; each annual response must confirm its year with an
+explicit matching selected option. Missing/ambiguous/mismatched selectors and redirects dropping
+the requested year fail before persistence. No year is inferred from prose or capture time.
+Annual variants keep the page's depth and count toward `max_pages`. Explicit year expansion also
+applies with `--no-follow`; that flag disables ordinary links, not the requested annual variants.
+Without `--year`, no extra annual variants are generated. Unadvertised requested years are not
+queued: check the captures and corpus report rather than assuming they exist.
+
+The `/en/rates/` catalog publishes URLs in a known `var allthedata = [...]` JSON array.
+Those URLs go through the same host/path/robots checks as anchors, without executing JavaScript.
+Other arbitrary script data is ignored. See [annual corpus workflow](annual-corpus.md).
+
 Run a small recursive crawl:
 
 ```console
@@ -54,7 +73,7 @@ data/manifests/crawl/<id>.json
 
 The manifest records original, final, and discovered canonical URLs, retrieval
 time, HTTP status and content type, SHA-256, language hint, page classification,
-wizard metadata, and content-duplicate provenance. Recrawls also record
+wizard metadata, content-duplicate provenance, and a verified `tax_year` or null. Recrawls also record
 `change_status` (`new`, `unchanged`, or `changed`) and the prior content hash
 when one exists; the CLI summarizes all three categories. IDs are deterministic from
 the normalized final URL; discovered canonical metadata is retained without

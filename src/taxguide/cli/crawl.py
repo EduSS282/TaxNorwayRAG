@@ -24,6 +24,12 @@ def crawl(
     max_pages: Annotated[int | None, typer.Option(min=1)] = None,
     max_depth: Annotated[int | None, typer.Option(min=0)] = None,
     delay: Annotated[float | None, typer.Option(min=0)] = None,
+    year: Annotated[
+        list[int] | None,
+        typer.Option(
+            "--year", min=1900, max=2100, help="Expand advertised rate years; repeatable."
+        ),
+    ] = None,
     output_dir: Annotated[Path, typer.Option()] = Path("data"),
     as_json: Annotated[bool, typer.Option("--json")] = False,
     no_follow: Annotated[bool, typer.Option("--no-follow")] = False,
@@ -82,6 +88,7 @@ def crawl(
                 max_pages=max_pages if max_pages is not None else crawler_config.max_pages,
                 max_depth=max_depth if max_depth is not None else crawler_config.max_depth,
                 follow_links=not no_follow,
+                tax_years=tuple(year or ()),
             )
         )
     except (TaxguideError, ValueError) as exc:

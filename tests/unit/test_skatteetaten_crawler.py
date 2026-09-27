@@ -53,6 +53,64 @@ def test_external_seed_is_rejected() -> None:
         crawler.crawl(CrawlRequest(url="https://example.com/"))
 
 
+@pytest.mark.parametrize("max_pages,expected", [(2, [None, 2025]), (3, [None, 2025, 2026])])
+def test_explicit_annual_expansion_obeys_page_limit_and_persists_year(
+    tmp_path: Path, max_pages: int, expected: list[int | None]
+) -> None:
+    url = f"{BASE}/en/rates/test/"
+
+    def html(year: int) -> str:
+        return (
+            '<html lang="en"><select id="js-rateSelectedYear">'
+            + "".join(
+                f'<option {"selected" if y == year else ""} value="{y}">{y}</option>'
+                for y in (2025, 2026)
+            )
+            + "</select><main><p>Annual rates.</p></main></html>"
+        )
+
+    http = FakeHttp(
+        {
+            f"{BASE}/robots.txt": robots(),
+            url: response(url, html(2026)),
+            url + "?year=2025": response(url + "?year=2025", html(2025)),
+            url + "?year=2026": response(url + "?year=2026", html(2026)),
+        }
+    )
+    result = SkatteetatenCrawler(http, FileCrawlArtifactRepository(tmp_path)).crawl(
+        CrawlRequest(
+            url=url,
+            tax_years=(2025, 2026, 2024),
+            max_pages=max_pages,
+            max_depth=0,
+            follow_links=False,
+        )
+    )
+    assert [page.tax_year for page in result.pages] == expected
+    assert not result.failures
+    assert not any("2024" in target for target in http.requested)
+    saved = tmp_path / "manifests" / "crawl" / f"{result.pages[1].document_id}.json"
+    assert json.loads(saved.read_text(encoding="utf-8"))["tax_year"] == 2025
+
+
+@pytest.mark.parametrize("redirect", [False, True])
+def test_crawler_rejects_ignored_year_before_saving(tmp_path: Path, redirect: bool) -> None:
+    base_url = f"{BASE}/en/rates/test/"
+    url = base_url + "?year=2025"
+    html = '<select id="js-rateSelectedYear"><option selected value="2026">2026</option></select>'
+    http = FakeHttp(
+        {
+            f"{BASE}/robots.txt": robots(),
+            url: response(base_url if redirect else url, html),
+        }
+    )
+    result = SkatteetatenCrawler(http, FileCrawlArtifactRepository(tmp_path)).crawl(
+        CrawlRequest(url=url, max_pages=1)
+    )
+    assert result.failed == 1 and result.fetched == 0
+    assert not (tmp_path / "manifests" / "crawl").exists()
+
+
 @pytest.mark.parametrize(
     ("redirect_path", "robots_body", "expected_category"),
     [

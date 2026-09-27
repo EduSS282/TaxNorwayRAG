@@ -159,6 +159,11 @@ No cambies a un modelo generativo mayor hasta medir latencia, RAM y VRAM con el 
 
 ### 5. Construir el corpus y responder
 
+Para preguntas de importes por año, añade fuentes anuales con la
+[guía de corpus 2025/2026](annual-corpus.md): el crawl general siguiente no garantiza años.
+En el portátil, `configs/base.yaml` usa `127.0.0.1` para Qdrant/Ollama locales; evita la espera
+de conexión observada con `localhost`. El LLM del sobremesa conserva su dirección remota.
+
 ```powershell
 uv run taxguide crawl `
   "https://www.skatteetaten.no/en/person/taxes/tax-return/" `

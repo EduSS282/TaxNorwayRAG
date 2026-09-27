@@ -185,6 +185,10 @@ def build(
         f"Indexed:          {'yes' if report.indexing_enabled else 'no'}\n\n"
         f"Run report: {report_path}"
     )
+    typer.echo(f"\nVerified document years (including unchanged): {report.documents_by_tax_year}")
+    typer.echo("Stage durations (seconds):")
+    for stage, seconds in report.stage_seconds.items():
+        typer.echo(f"  {stage}: {seconds:.3f}")
 
 
 def _show_selection(selection: CorpusSelection, as_json: bool, list_documents: bool) -> None:

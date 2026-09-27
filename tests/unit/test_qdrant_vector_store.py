@@ -252,6 +252,14 @@ def test_qdrant_checks_for_an_existing_document_version() -> None:
         expected_chunks=[chunk],
     )
     changed_content = chunk.model_copy(update={"content_hash": "e" * 64})
+    changed_year = chunk.model_copy(
+        update={"metadata": chunk.metadata.model_copy(update={"tax_year": 2026})}
+    )
+    assert not store.has_document_version(
+        document_id=chunk.document_id,
+        version_id=chunk.metadata.version_id or "",
+        expected_chunks=[changed_year],
+    )
     assert not store.has_document_version(
         document_id=chunk.document_id,
         version_id=chunk.metadata.version_id or "",
