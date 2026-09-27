@@ -42,6 +42,12 @@ LLM de 4B.
 
 ## Abrir la app en sobremesa y portátil
 
+La configuración base actual apunta el LLM a `http://100.112.6.87:8080`; los demás servicios siguen
+locales. La máquina de Python debe alcanzar esa dirección privada. En el equipo del LLM, sirve
+con `--host 100.112.6.87 --port 8080` (si esa IP le pertenece) y permite acceso solo desde el host
+de la API mediante firewall/red privada. No basta con escuchar en `127.0.0.1`. Para ejecutar todo
+en una sola máquina, restaura `generation.base_url: http://127.0.0.1:8080` en tu configuración.
+
 Primero prepara corpus, Qdrant y modelos siguiendo la etapa 1 de esta guía. Después mantén dos
 terminales en el sobremesa. En la primera, desde la raíz del repositorio:
 

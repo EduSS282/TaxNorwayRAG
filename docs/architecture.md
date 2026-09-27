@@ -216,6 +216,10 @@ model endpoints. A remote VM is suitable for crawling, scheduled work, backups, 
 Qdrant service, but not required for local development. See [local runtime](local-runtime.md) and
 ADR 0005.
 
+The operator's current `configs/base.yaml` selects a remote generator at
+`http://100.112.6.87:8080`, while the other service endpoints remain local. This is a deployment
+choice, not remote process supervision; the API host requires private connectivity to that server.
+
 ## Known architectural gaps
 
 The grounded CLI milestone is complete, but these gaps remain:

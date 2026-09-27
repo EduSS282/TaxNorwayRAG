@@ -51,7 +51,9 @@ def test_base_config_loads_without_overlay():
     assert config.retrieval.reranker_base_url == "http://localhost:8001"
     assert config.generation.model_profile == "portable"
     assert config.generation.provider == "openai_compatible"
-    assert config.generation.base_url == "http://127.0.0.1:8080"
+    assert config.generation.base_url == "http://100.112.6.87:8080"
+    assert config.corpus.embedding_base_url == "http://127.0.0.1:11434"
+    assert config.corpus.qdrant_url == "http://127.0.0.1:6333"
     assert config.generation.model == "Qwen/Qwen3-4B-Instruct-2507"
     assert config.generation.timeout == 180.0
     assert config.generation.evidence_max_tokens == 2400

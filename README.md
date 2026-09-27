@@ -141,6 +141,11 @@ The CLI loads `configs/base.yaml` when it exists in the working directory. `--co
 explicit base file and `--overlay` recursively merges and validates an environment-specific
 overlay. Paths are relative to the working directory.
 
+The checked-in base configuration currently points the generator to the operator's remote
+endpoint `http://100.112.6.87:8080`; embeddings, reranker and Qdrant remain local. The API host
+must be able to reach that private address. For the all-local commands above, override
+`generation.base_url` with `http://127.0.0.1:8080`. See [local runtime](docs/local-runtime.md).
+
 ## Architecture summary
 
 ```text

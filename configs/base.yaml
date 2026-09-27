@@ -32,10 +32,10 @@ corpus:
   overlap_tokens: 0
   embedding_provider: ollama
   embedding_model: qwen3-embedding:0.6b
-  embedding_base_url: http://localhost:11434
+  embedding_base_url: http://127.0.0.1:11434
   embedding_timeout: 120.0
   embedding_batch_size: 32
-  qdrant_url: http://localhost:6333
+  qdrant_url: http://127.0.0.1:6333
   qdrant_collection: taxguide_chunks_temporal_v1
 retrieval:
   default_mode: dense
@@ -47,7 +47,7 @@ retrieval:
 generation:
   model_profile: portable
   provider: openai_compatible
-  base_url: http://127.0.0.1:8080
+  base_url: http://100.112.6.87:8080
   model: Qwen/Qwen3-4B-Instruct-2507
   timeout: 180.0
   evidence_max_tokens: 2400
