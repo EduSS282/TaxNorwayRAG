@@ -77,6 +77,8 @@ def available(service, connections):
 @pytest.fixture
 def control(tmp_path):
     base = AppConfig()
+    base.corpus.raw_directory = tmp_path / "raw"
+    base.corpus.crawl_manifest_directory = tmp_path / "crawl-manifests"
     base.retrieval.reranker_provider = "llamacpp"
     profiles = LocalProfiles(
         services={

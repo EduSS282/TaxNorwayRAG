@@ -89,6 +89,7 @@ export function TaxGuide() {
         </a>
         <span className="version">RESEARCH PREVIEW · v0.9</span>
         <a href="/settings">{text.settings}</a>
+        <a href="/crawler">Corpus / Crawler</a>
       </header>
       <main>
         <div className="intro">

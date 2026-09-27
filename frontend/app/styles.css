@@ -80,6 +80,7 @@ label {
   border-bottom: 1px solid var(--border);
   padding: 20px 5%;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 20px;
@@ -292,6 +293,9 @@ footer {
 }
 .settings-page {
   max-width: 1100px;
+}
+.crawler-card {
+  overflow-wrap: anywhere;
 }
 .settings-page .panel {
   margin-top: 22px;

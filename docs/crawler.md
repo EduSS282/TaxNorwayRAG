@@ -11,6 +11,11 @@ areas, traverse wizard branches, or perform downstream chunking/indexing.
 
 ## Commands
 
+An authenticated `/crawler` frontend also supports source selection, local inventory, background
+progress and cancellation. See [crawler UI](crawler-ui.md). It shares this crawler and catalog,
+but writes the API's configured corpus input directories; CLI `--output-dir` remains independent.
+Do not run CLI crawls or synchronize files into those directories while a web crawl is active.
+
 Acquire one page:
 
 ```console
@@ -24,7 +29,7 @@ uv run taxguide crawl --source skatteetaten-tax-return-en --max-pages 25 --max-d
 ```
 
 `--sources-file` selects another source-policy YAML. Each entry defines a unique ID, domain,
-seed URL, allowed path prefixes, optional language list, and priority. The CLI uses that source's
+seed URL, allowed path prefixes, optional display `title`, language list, and priority. The CLI uses that source's
 hosts and paths for the seed, discovered links, and every content redirect. A page with a detected
 language outside the source's list is skipped without saving. The source ID is stored in each
 capture manifest. `priority` is recorded policy metadata; crawl scheduling by priority is not yet

@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// Fixed destinations only; admin credentials are forwarded solely to /v1/admin.
+// Fixed destinations only; credentials go solely to operator endpoints.
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ operation: string }> },
 ) {
   const { operation } = await context.params;
-  if (!["query", "retrieve", "admin"].includes(operation)) {
+  if (!["query", "retrieve", "admin", "crawl"].includes(operation)) {
     return NextResponse.json({ detail: "Unknown operation" }, { status: 404 });
   }
   const headers = { "Cache-Control": "no-store" };
@@ -59,7 +59,7 @@ export async function POST(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(operation === "admin"
+        ...(["admin", "crawl"].includes(operation)
           ? { Authorization: request.headers.get("authorization") || "" }
           : {}),
       },

@@ -7,8 +7,8 @@ hardware disponible:
 - portátil: Intel i7-13700H y 16 GB de RAM DDR5;
 - Oracle Free Tier: 2 OCPU y 12 GB de RAM.
 
-La CLI `taxguide`, la API FastAPI y la interfaz Next.js son puntos de entrada implementados. La API carece
-de autenticación: úsala en loopback o tras una pasarela privada autenticada. Qdrant, Ollama y
+La CLI `taxguide`, la API FastAPI y la interfaz Next.js son puntos de entrada implementados. Las consultas de la API carecen
+de autenticación; administración de servicios/crawler exige clave. Usa loopback o una pasarela privada autenticada. Qdrant, Ollama y
 llama.cpp son procesos externos que TaxGuide consume por HTTP.
 
 ## Decisión recomendada
@@ -84,6 +84,21 @@ Alternativa para desarrollar la UI en el portátil: ejecuta Next.js allí y crea
 `ssh -N -L 8000:127.0.0.1:8000 USUARIO@IP_PRIVADA_SOBREMESA`. Su `TAXGUIDE_API_URL` seguirá siendo
 `http://127.0.0.1:8000`. Oracle continúa solo con tareas offline; no es necesario desplegar allí
 la UI ni abrir los puertos 3000/8000/6333/8080/11434 a Internet. No se crean túneles automáticamente.
+
+## Descargas desde el navegador (también con API en el portátil)
+
+Abre `/crawler` y habilita `TAXGUIDE_ADMIN_TOKEN` en la terminal de la API siguiendo
+[crawler web](crawler-ui.md). Permite seleccionar secciones, comprobar capturas y descargar sin
+arrancar ningún modelo. Si Python corre en el portátil y llama.cpp en el sobremesa, el crawler
+usa CPU/red/disco del **portátil**, sin ocupar la GPU del sobremesa. No hay control remoto de Oracle.
+Si Python está en el sobremesa y accedes mediante túnel, los archivos quedan en el sobremesa.
+
+Las capturas hechas por CLI en Oracle solo aparecen después de sincronizar HTML y manifiestos a
+los directorios `corpus.raw_directory` y `corpus.crawl_manifest_directory` de la API. Haz la
+sincronización sin un crawl web o build concurrente; después pulsa **Actualizar inventario**.
+La descarga no indexa: ejecuta `taxguide corpus build ... --index` en la máquina con acceso a
+embeddings/Qdrant y la misma configuración/directorios. Los cambios de `/settings` no modifican
+el YAML de ese comando. La [guía de la interfaz](frontend.md) contiene los comandos de arranque.
 
 ## Etapa 1: validar todo en el sobremesa
 

@@ -86,6 +86,16 @@ esté lista. No hay arranque automático al abrir el panel ni descarga de modelo
 pueden configurar y comprobar, pero su arranque sigue siendo manual. Los cambios del panel afectan
 solo a la API, no al YAML del CLI. El panel de administración está en español.
 
+## Crawler y corpus
+
+El enlace **Corpus / Crawler** abre `/crawler`. Usa la misma clave de administración para ver
+capturas existentes y seleccionar fuentes del catálogo. Permite descargar varias secciones,
+seleccionar años de tarifas, limitar páginas/profundidad, consultar progreso y cancelar conservando
+archivos. No requiere modelos ni Qdrant. Las capturas se guardan donde corre Python.
+El panel distingue descarga de indexación: **no asegura cobertura completa ni consulta Qdrant**.
+El build/index sigue por CLI. Consulta [el manual del crawler web](crawler-ui.md) para arrancarlo,
+entender los conteos y alinear directorios/conexiones. Reinicia una API antigua para habilitar la ruta.
+
 ## Inspector (#78)
 
 Abre «Inspector de retrieval para desarrolladores». Puedes cambiar dense / hybrid / hybrid +
@@ -117,9 +127,13 @@ se muestran por separado. No hay persistencia de trazas ni evaluación automáti
 El proxy espera hasta 180 segundos y el navegador 190; un timeout no garantiza que se cancele
 el cómputo Python ya iniciado. Las solicitudes son sin caché, sin reintentos automáticos y no
 reenvían cookies ni cabeceras del navegador a la API, excepto `Authorization` exclusivamente para
-`/api/admin`. Solo están permitidas las operaciones query, retrieve y admin en el backend fijo. Se
+`/api/admin` y `/api/crawl`. Solo están permitidas query, retrieve, admin y crawl en el backend fijo. Se
 rechazan peticiones con origen explícito distinto; esto no sustituye autenticación o protección
 de un despliegue público. No expongas estos servicios sin una pasarela autenticada.
+
+El cliente del crawler espera 30 segundos por operación de control; la descarga corre en segundo
+plano sin mantener esa petición abierta. Sondea cada 2 segundos solo mientras haya un trabajo
+activo y el panel permanezca desbloqueado. Un error pausa el sondeo hasta actualizar manualmente.
 
 ## Verificación y límites
 
@@ -141,3 +155,5 @@ ambos grupos. La revisión visual y estos tests no reemplazan el benchmark de co
 que sigue pendiente. También se prueban desbloqueo, borradores, guardado/restauración, controles de
 servicios y aislamiento de la clave en el proxy. No hay chat persistente, cuentas, despliegue
 público, descargas de modelos ni control de procesos remotos.
+Los tests del crawler cubren inventario, selección, años, progreso/cancelación, reconexión a trabajo
+activo, errores y vista móvil; usan fixtures, no descargan el sitio oficial ni evalúan respuestas RAG.

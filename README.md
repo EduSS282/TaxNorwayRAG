@@ -36,6 +36,8 @@ local question interface, cited sources, tax-year/language controls, and a devel
   four-stage retrieval comparison, and opt-in inspection of the actual final answer context.
 - Opt-in operator settings for saved model/Qdrant connections, dependency checks, and safe
   start/stop of preconfigured services on the API host.
+- Authenticated crawler page with section selection, verified local capture inventory, bounded
+  background downloads, progress and cancellation; indexing remains a separate CLI operation.
 
 See [current architecture](docs/architecture.md) for component boundaries and
 [grounded-generation status](docs/generation.md) for the remaining end-to-end work.
@@ -136,6 +138,11 @@ local profile. Follow [runtime management](docs/runtime-management.md) for first
 “Local” means the Python API machine, not the browser machine. Model downloads and corpus indexing
 remain manual; remote endpoints can be used and checked, but not remotely started or stopped.
 
+Open **http://127.0.0.1:3000/crawler** to select official sections and inspect existing downloads.
+It uses the same operator key, downloads on the API machine, and needs no model services.
+Downloaded pages are not proof of complete coverage or indexing. See [crawler UI](docs/crawler-ui.md)
+for startup, annual-rate selection, progress, cancellation and the subsequent corpus build.
+
 The CLI also supports direct local-file ingestion and chunk inspection:
 
 ```bash
@@ -218,6 +225,9 @@ Candidate indexing, live evaluation artifacts, and reviewed alias promotion/roll
 in [index lifecycle](docs/index-lifecycle.md).
 Named crawl scopes live in [configs/sources.yaml](configs/sources.yaml); URL-only crawls remain
 available under the host/path policy in `configs/base.yaml`. See [crawler](docs/crawler.md).
+The shared catalog has twelve English sections, including abroad/exit tax, employment/pensions,
+foreign workers/PAYE, shares, family and tax assessment. Refresh the crawler inventory to see
+catalog changes; downloads still require explicit selection, with at most eight sections per job.
 
 ## Current limitations and next milestone
 
@@ -261,6 +271,7 @@ contract and its remaining limitations.
 - [Desktop, laptop, and Oracle deployment](docs/three-machine-deployment.md)
 - [Grounded generation status](docs/generation.md)
 - [Crawler](docs/crawler.md)
+- [Crawler page and local inventory](docs/crawler-ui.md)
 - [Corpus workflow](docs/corpus.md)
 - [Retrieval and evaluation](docs/retrieval.md)
 - [Candidate index lifecycle](docs/index-lifecycle.md)

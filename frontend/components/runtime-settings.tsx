@@ -111,6 +111,8 @@ export function RuntimeSettings() {
   return (
     <main lang="es" className="settings-page">
       <a href="/">← Volver a las preguntas</a>
+      {" · "}
+      <a href="/crawler">Corpus / Crawler</a>
       <p className="eyebrow">ADMINISTRACIÓN PRIVADA</p>
       <h1>Conexiones y servicios</h1>
       <p>
@@ -263,8 +265,9 @@ export function RuntimeSettings() {
               </p>
               <p className="help">
                 Los proveedores «En el proceso Python» pueden descargar pesos
-                ausentes al consultar. Prepara su caché/modo offline si no quieres
-                descargas; los botones de este panel no cargan esos modelos.
+                ausentes al consultar. Prepara su caché/modo offline si no
+                quieres descargas; los botones de este panel no cargan esos
+                modelos.
               </p>
               <div className="runtime-actions">
                 <button

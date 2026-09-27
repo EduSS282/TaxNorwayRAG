@@ -14,6 +14,7 @@ class SourceDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str = Field(min_length=1)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
     domain: str = Field(min_length=1)
     seed_url: str = Field(min_length=1)
     language: tuple[str, ...] = ()

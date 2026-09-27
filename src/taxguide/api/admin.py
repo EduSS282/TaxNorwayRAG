@@ -5,10 +5,13 @@ from subprocess import SubprocessError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
+from taxguide.crawling.management import CrawlCommand, CrawlConflict, CrawlManager, CrawlView
 from taxguide.runtime.controller import AdminRequest, ConflictError, RuntimeController
 
 
-def admin_router(controller: RuntimeController | None, token: str | None) -> APIRouter:
+def admin_router(
+    controller: RuntimeController | None, token: str | None, crawler: CrawlManager | None = None
+) -> APIRouter:
     router = APIRouter()
 
     def authorize(request: Request) -> None:
@@ -37,5 +40,19 @@ def admin_router(controller: RuntimeController | None, token: str | None) -> API
             raise HTTPException(
                 503, "Local operation failed; verify files, processes and permissions"
             ) from exc
+
+    @router.post("/v1/crawl", dependencies=[Depends(authorize)])
+    def crawl(payload: CrawlCommand, response: Response) -> CrawlView:
+        response.headers["Cache-Control"] = "no-store"
+        if crawler is None:
+            raise HTTPException(503, "Crawler administration unavailable")
+        try:
+            return crawler.execute(payload)
+        except CrawlConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except OSError as exc:
+            raise HTTPException(503, "Cannot read crawler inventory") from exc
 
     return router

@@ -72,7 +72,13 @@ class SkatteetatenCrawler:
         self.clock = clock
         self._robots: dict[str, RobotFileParser | bool] = {}
 
-    def crawl(self, request: CrawlRequest) -> CrawlResult:
+    def crawl(
+        self,
+        request: CrawlRequest,
+        *,
+        progress: Callable[[int, int, int], None] | None = None,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> CrawlResult:
         self._robots = {}
         seed = normalize_url(request.url)
         self._validate(seed)
@@ -86,6 +92,8 @@ class SkatteetatenCrawler:
 
         attempts = 0
         while queue and attempts < request.max_pages:
+            if cancelled is not None and cancelled():
+                break
             original_url, url, depth = queue.popleft()
             if url in visited:
                 continue
@@ -137,6 +145,9 @@ class SkatteetatenCrawler:
                     )
                 )
                 continue
+            finally:
+                if progress is not None:
+                    progress(len(pages), len(failures), len(skipped))
             # Annual variants belong to the same page/depth, but count toward max_pages.
             # Explicit --year expansion also works with --no-follow.
             for link in reversed(

@@ -36,6 +36,7 @@ connection errors are returned as service-unavailable responses, without downstr
 | `GET /v1/version` | none | Package and API version |
 | `GET /v1/metrics` | none | Per-process aggregate latency seconds by stage |
 | `POST /v1/admin` | Operator action and bearer key | Connections, dependency states, owned processes and lifecycle events |
+| `POST /v1/crawl` | Operator key; `get`, `status`, `start` or `cancel` | Local section inventory and bounded acquisition job snapshot |
 
 The default mode comes from `retrieval.default_mode` (`dense` in the base config); `sparse`,
 `hybrid`, and `reranked` are also accepted. `mode: "all"` is a diagnostic option that runs all
@@ -100,6 +101,16 @@ and stale revisions return 409; invalid destinations/inputs return 422; process/
 return sanitized 503 errors. Responses are not cached. Changing embedding identity requires a
 different collection and `confirm_reindex: true`; indexing itself is a separate CLI operation.
 
+## Crawler administration
+
+The crawler endpoint shares the admin key and origin restrictions, via the fixed Next.js
+`/api/crawl` proxy. `start` accepts catalog `sources`, `years` (up to 5, 1900–2100), `max_pages`
+(1–200 per source) and `max_depth` (0–3); at most 8 sources, one active job. It returns HTTP 200
+with an accepted job snapshot, not a completed crawl. `cancel` requires the current `job_id`.
+`get` includes inventory; `status` returns `sections: null` with just the job snapshot. Conflicts
+return 409, invalid inputs 422. Jobs do not survive process restart; artifacts do. See the full
+[crawler contract and lifecycle](crawler-ui.md#contrato-http-y-límites-operativos).
+
 ## Logging, metrics, and tracing
 
 Each HTTP request emits one JSON log record with method, path, status, duration, request ID, trace
@@ -111,7 +122,7 @@ fixed-bucket counts for HTTP requests and the retrieval, reranking, and generati
 are in memory, per process, and reset on restart. Trace spans are logged, not retained in a
 searchable backend or propagated to Qdrant/model HTTP calls. OpenTelemetry export is deferred.
 
-Only `/v1/admin` has operator authentication. Query/retrieval endpoints have no authentication,
+Only `/v1/admin` and `/v1/crawl` have operator authentication. Query/retrieval endpoints have no authentication,
 rate limiting, CORS policy for browser clients, or TLS termination.
 Do not expose it directly to the public Internet; use loopback, a private tunnel, or an
 authenticated gateway. Run one worker on constrained local hardware unless measured otherwise:

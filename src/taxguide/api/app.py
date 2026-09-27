@@ -1,5 +1,6 @@
 """FastAPI boundary for independent retrieval, reranking, and grounded answers."""
 
+from asyncio import to_thread
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
@@ -21,6 +22,7 @@ from taxguide.api.models import (
 )
 from taxguide.config.loader import load_config
 from taxguide.config.models import AppConfig
+from taxguide.crawling.management import CrawlManager
 from taxguide.domain.exceptions import (
     CrossYearRetrievalError,
     TaxguideError,
@@ -62,6 +64,7 @@ _LOGGABLE_PATHS = {
     "/v1/rerank",
     "/v1/query",
     "/v1/admin",
+    "/v1/crawl",
     "/openapi.json",
     "/docs",
     "/redoc",
@@ -76,9 +79,10 @@ def create_app(
     clock: Callable[[], float] = perf_counter,
     runtime: RuntimeController | None = None,
     admin_token: str | None = None,
+    crawler: CrawlManager | None = None,
 ) -> FastAPI:
     """Compose a testable HTTP boundary without loading models or contacting Qdrant."""
-    config = settings or _settings()
+    config = settings or (runtime.base if runtime is not None else _settings())
     service = backend or ConfiguredBackend(config)
     token = admin_token if admin_token is not None else environ.get("TAXGUIDE_ADMIN_TOKEN")
     if token and len(token) < 32:
@@ -86,6 +90,11 @@ def create_app(
     controller = runtime
     if controller is None and token and backend is None:
         controller = from_environment(config)
+    crawl_manager = crawler
+    if crawl_manager is None and controller is not None and token:
+        crawl_manager = CrawlManager(
+            config, Path(environ.get("TAXGUIDE_SOURCES_FILE", "configs/sources.yaml"))
+        )
 
     def active() -> tuple[AppConfig, ApiBackend]:
         return controller.snapshot() if controller is not None else (config, service)
@@ -95,8 +104,13 @@ def create_app(
         if controller is not None:
             controller.store.acquire()
         try:
+            if crawl_manager is not None:
+                crawl_manager.store.acquire()
             yield
         finally:
+            if crawl_manager is not None:
+                await to_thread(crawl_manager.close)
+                crawl_manager.store.release()
             if controller is not None:
                 controller.supervisor.close()
                 controller.store.release()
@@ -104,7 +118,7 @@ def create_app(
     registry = metrics or MetricsRegistry()
     package_version = _version()
     application = FastAPI(title="TaxGuide Norway API", version=package_version, lifespan=lifespan)
-    application.include_router(admin_router(controller, token))
+    application.include_router(admin_router(controller, token, crawl_manager))
 
     @application.middleware("http")
     async def observe_request(

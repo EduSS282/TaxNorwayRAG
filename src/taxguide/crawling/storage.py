@@ -27,9 +27,15 @@ def _atomic_write(path: Path, content: bytes) -> None:
 
 
 class FileCrawlArtifactRepository:
-    def __init__(self, output_directory: Path = Path("data")) -> None:
-        self.raw_directory = output_directory / "raw" / "skatteetaten"
-        self.manifest_directory = output_directory / "manifests" / "crawl"
+    def __init__(
+        self,
+        output_directory: Path = Path("data"),
+        *,
+        raw_directory: Path | None = None,
+        manifest_directory: Path | None = None,
+    ) -> None:
+        self.raw_directory = raw_directory or output_directory / "raw" / "skatteetaten"
+        self.manifest_directory = manifest_directory or output_directory / "manifests" / "crawl"
 
     def save(self, page: CrawledPage) -> None:
         raw_path = self.raw_directory / f"{page.document_id}.html"

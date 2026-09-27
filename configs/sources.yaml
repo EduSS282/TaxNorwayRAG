@@ -1,5 +1,6 @@
 sources:
   - id: skatteetaten-rates-en
+    title: Tarifas y límites anuales
     domain: skatteetaten.no
     seed_url: https://www.skatteetaten.no/en/rates/
     language: [en]
@@ -7,9 +8,82 @@ sources:
     allowed_paths:
       - /en/rates/
   - id: skatteetaten-tax-return-en
+    title: Declaración de impuestos
     domain: skatteetaten.no
     seed_url: https://www.skatteetaten.no/en/person/taxes/tax-return/
     language: [en]
     priority: 100
     allowed_paths:
       - /en/person/taxes/tax-return/
+  - id: skatteetaten-tax-card-en
+    title: Tarjeta fiscal y anticipos
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/tax-deduction-card-and-advance-tax/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/tax-deduction-card-and-advance-tax/
+  - id: skatteetaten-bank-en
+    title: Bancos y préstamos
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/bank-and-loans/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/get-the-taxes-right/bank-and-loans/
+  - id: skatteetaten-property-en
+    title: Vivienda y bienes
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/property-and-belongings/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/get-the-taxes-right/property-and-belongings/
+  - id: skatteetaten-gifts-en
+    title: Donaciones y herencias
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/gift-and-inheritance/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/get-the-taxes-right/gift-and-inheritance/
+  - id: skatteetaten-abroad-en
+    title: Ingresos, patrimonio y residencia en el extranjero
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/abroad/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/get-the-taxes-right/abroad/
+  - id: skatteetaten-employment-en
+    title: Empleo, prestaciones y pensiones
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/employment-benefits-and-pensions/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/get-the-taxes-right/employment-benefits-and-pensions/
+  - id: skatteetaten-foreign-workers-en
+    title: Trabajadores extranjeros y PAYE
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/foreign/are-you-intending-to-work-in-norway/
+    language: [en]
+    allowed_paths:
+      - /en/person/foreign/are-you-intending-to-work-in-norway/
+      # The worker guide links to PAYE outside its own URL subtree.
+      - /en/person/taxes/tax-deduction-card-and-advance-tax/i-am-a-foreign-employee/paye/
+  - id: skatteetaten-shares-en
+    title: Acciones y valores
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/shares-and-securities/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/get-the-taxes-right/shares-and-securities/
+  - id: skatteetaten-family-en
+    title: Familia y salud
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/family-and-health/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/get-the-taxes-right/family-and-health/
+  - id: skatteetaten-assessment-en
+    title: Liquidación, devoluciones y reclamaciones
+    domain: skatteetaten.no
+    seed_url: https://www.skatteetaten.no/en/person/taxes/tax-assessment/
+    language: [en]
+    allowed_paths:
+      - /en/person/taxes/tax-assessment/

@@ -25,7 +25,7 @@ The FastAPI boundary exposes retrieval, reranking, and grounded answers through 
 It composes existing application services and adds request-scoped trace IDs, JSON access logs, and
 process-local latency metrics. It does not start services or load model weights at import.
 The Next.js App Router frontend is a separate Node process. The browser posts only to its
-same-origin `/api/query`, `/api/retrieve`, and `/api/admin` handlers, which forward JSON to a fixed server-side
+same-origin `/api/query`, `/api/retrieve`, `/api/admin`, and `/api/crawl` handlers, which forward JSON to a fixed server-side
 `TAXGUIDE_API_URL`. No Python/domain code is duplicated in the frontend. There is no authenticated
 public deployment. See [API](api.md), [frontend](frontend.md), ADR 0009 and ADR 0010.
 
@@ -61,6 +61,16 @@ and preparation advances only through dependencies ready at that moment. Remote 
 downloads, durable daemon supervision, and public query authentication remain out of scope.
 See [runtime management](runtime-management.md) and ADR 0011.
 
+The `/crawler` operator page uses `/v1/crawl` with the same authentication/origin policy.
+`crawling/management.py` owns a single bounded background acquisition job and a verified local
+inventory over the API's corpus input directories. Sources are server-owned catalog entries;
+browser inputs cannot choose arbitrary URLs, commands or storage paths. A separate directory lock
+prevents competing web managers. Progress is process-local; captures persist, but jobs do not resume
+on restart. Normal shutdown cancels and joins the worker. CLI writers and external synchronization
+must remain mutually exclusive with web acquisition. No models or Qdrant are involved, and
+inventory does not assert indexing, completeness or freshness. See [crawler UI](crawler-ui.md)
+and [ADR 0014](adr/0014-operator-crawl-jobs.md).
+
 ## Offline pipeline
 
 ```text
@@ -81,6 +91,12 @@ each content redirect hop, depth, page count, response size, retry policy, and d
 policies are input YAML; raw HTML and per-page capture manifests are stored separately. Corpus selection uses
 manifests rather than filenames, excludes failed/non-HTML captures, and can exclude duplicate or
 interactive-wizard pages.
+
+The shared source catalog defines twelve English acquisition scopes. Abroad (including exit tax),
+employment/pensions, foreign workers, shares, family and assessment supplement the original six.
+The foreign-worker scope explicitly permits the linked PAYE subtree without allowing the entire
+foreign-national portal. Scopes can overlap; per-section inventory totals are not globally additive.
+Adding sources does not change routing taxonomy, automatically acquire pages or index documents.
 
 `RawDocument → ParsedDocument → Document` separates source capture, extraction, and cleanup.
 Documents and chunks retain source URL, local path, retrieval timestamp, content hash, language,
