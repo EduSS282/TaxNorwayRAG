@@ -8,7 +8,7 @@ release. The API and query endpoints are unauthenticated; use only loopback/priv
 | Issue | Current evidence | Remaining gate |
 | --- | --- | --- |
 | #79–#81 | PII-minimized app logs, conservative injection check, threat model and tests | Model/proxy logs and adversarial semantic review are separate |
-| #82 | Retrieval artifact comparison and deterministic tests | Generation-quality regression dataset and gate |
+| #82 | Retrieval and optional per-case generation artifact comparison with deterministic tests | Reviewed real-case inputs belong to #86 |
 | #83 | GitHub Actions checks Python, browser and Compose syntax | Hosted workflow result after push |
 | #84 | Dockerfiles and private Compose configuration | Build and live container smoke test on an active Docker daemon |
 | #85, #87 | Current technical runbooks, demo script and architecture diagram | Keep synchronized as functionality changes |
@@ -55,6 +55,9 @@ other machines without checking routing and firewall policy.
    Defaults allow at most a 0.05 absolute drop in Recall@5 or nDCG@5 and a 1.5× mean-latency
    increase for each pipeline. These are exploratory tolerances, not approved tax-safety targets.
    Missing/mismatched artifacts fail the gate. Inspect individual query failures as well.
+   If reviewed generation reports exist, pass `--generation-baseline path/to/old.json`
+   and `--generation-candidate path/to/new.json` in the same command. The gate checks matched
+   cases and score/abstention declines; it does not produce semantic judgments.
 5. Run the live grounded-answer smoke test, then perform a reviewed generation-quality study
    (faithfulness, citation correctness, abstention, numerical/year accuracy and injection cases).
    The current smoke test is **not** that study. Record pass/fail and human sign-off.

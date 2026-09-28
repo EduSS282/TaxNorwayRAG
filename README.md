@@ -39,7 +39,7 @@ local question interface, cited sources, tax-year/language controls, and a devel
 - Authenticated crawler page with section selection, verified local capture inventory, bounded
   background downloads, progress and cancellation; indexing remains a separate CLI operation.
 - PII-minimized application logs, conservative retrieved-instruction filtering, and an offline
-  retrieval regression gate; these do not establish answer-level safety or fiscal accuracy.
+  retrieval/generation report regression gate; these do not establish fiscal accuracy.
 - Private single-host Docker Compose files for API, frontend and Qdrant; models remain external.
 
 See [current architecture](docs/architecture.md) for component boundaries and
@@ -228,7 +228,8 @@ Candidate indexing, live evaluation artifacts, and reviewed alias promotion/roll
 in [index lifecycle](docs/index-lifecycle.md).
 The artifact regression command is `uv run taxguide evaluation regression --baseline
 path/to/baseline.json --candidate path/to/candidate.json`; it requires a reviewed baseline for
-the same gold-set version. See [private readiness](docs/production-readiness.md). Existing CI
+the same gold-set version. Optional `--generation-baseline` and `--generation-candidate` compare
+reviewed per-case generation reports too. See [private readiness](docs/production-readiness.md). Existing CI
 checks are deterministic and do not run live model benchmarks.
 Named crawl scopes live in [configs/sources.yaml](configs/sources.yaml); URL-only crawls remain
 available under the host/path policy in `configs/base.yaml`. See [crawler](docs/crawler.md).

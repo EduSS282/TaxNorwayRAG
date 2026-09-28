@@ -137,6 +137,11 @@ uv run pytest -m generation_eval -s
 `TAXGUIDE_GENERATION_EVAL_MODE` selects the retrieval mode (default `reranked`) and
 `TAXGUIDE_GENERATION_EVAL_QUESTION` overrides the default 2025 wealth-tax question. The test is a
 connectivity/orchestration smoke check, not a quality benchmark.
+For reviewed offline cases, `evaluate_generation` returns a serializable
+`GenerationEvaluationReport`; supply its baseline and candidate JSON files to
+`taxguide evaluation regression` with `--generation-baseline` and `--generation-candidate`.
+It rejects mismatched case sets and score/abstention regressions. Semantic evaluator judgments
+must still be created and reviewed separately; the two-case fixture is not a production baseline.
 
 ## Known limitations
 

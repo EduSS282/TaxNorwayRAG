@@ -7,7 +7,12 @@ import pytest
 from typer.testing import CliRunner
 
 from taxguide.cli.main import app
-from taxguide.evaluation.regression import RegressionLimits, retrieval_regressions
+from taxguide.evaluation.generation import GenerationEvaluationReport, GenerationEvaluationRow
+from taxguide.evaluation.regression import (
+    RegressionLimits,
+    generation_regressions,
+    retrieval_regressions,
+)
 from taxguide.evaluation.retrieval_benchmark import (
     BenchmarkRow,
     RetrievalEvaluationArtifact,
@@ -79,8 +84,85 @@ def test_regression_cli_reports_pass_and_failure(tmp_path: Path) -> None:
     args = ["evaluation", "regression", "--baseline", str(baseline), "--candidate", str(candidate)]
     passed = runner.invoke(app, args)
     assert passed.exit_code == 0
-    assert "regression gate passed" in passed.output
+    assert "Regression gate passed" in passed.output
     candidate.write_text(_artifact(recall=0.5).model_dump_json(), encoding="utf-8")
     failed = runner.invoke(app, args)
     assert failed.exit_code == 1
     assert "Recall@5 regressed" in failed.output
+
+
+def _generation_report(
+    *, faithfulness: float = 0.9, abstention: bool = True
+) -> GenerationEvaluationReport:
+    return GenerationEvaluationReport(
+        version="v1",
+        rows=[
+            GenerationEvaluationRow(
+                case_id="case-1",
+                faithfulness=faithfulness,
+                answer_correctness=0.9,
+                citation_precision=1.0,
+                citation_recall=1.0,
+                abstention_correct=abstention,
+            )
+        ],
+        faithfulness=faithfulness,
+        answer_correctness=0.9,
+        citation_precision=1.0,
+        citation_recall=1.0,
+        abstention_accuracy=float(abstention),
+    )
+
+
+def test_generation_regression_gate_checks_case_scores_and_abstention() -> None:
+    assert generation_regressions(_generation_report(), _generation_report()) == []
+    findings = generation_regressions(
+        _generation_report(), _generation_report(faithfulness=0.5, abstention=False)
+    )
+    assert findings == [
+        "case-1: faithfulness regressed",
+        "case-1: abstention correctness regressed",
+    ]
+
+
+def test_generation_gate_rejects_incomparable_reports() -> None:
+    with pytest.raises(ValueError, match="same gold"):
+        generation_regressions(
+            _generation_report(), _generation_report().model_copy(update={"version": "v2"})
+        )
+    with pytest.raises(ValueError, match="identical case IDs"):
+        generation_regressions(
+            _generation_report(),
+            _generation_report().model_copy(update={"rows": []}),
+        )
+    duplicated = _generation_report().model_copy(update={"rows": _generation_report().rows * 2})
+    with pytest.raises(ValueError, match="duplicate case IDs"):
+        generation_regressions(_generation_report(), duplicated)
+
+
+def test_regression_cli_accepts_optional_generation_pair(tmp_path: Path) -> None:
+    baseline = tmp_path / "retrieval-baseline.json"
+    candidate = tmp_path / "retrieval-candidate.json"
+    generation_baseline = tmp_path / "generation-baseline.json"
+    generation_candidate = tmp_path / "generation-candidate.json"
+    baseline.write_text(_artifact().model_dump_json(), encoding="utf-8")
+    candidate.write_text(_artifact().model_dump_json(), encoding="utf-8")
+    generation_baseline.write_text(_generation_report().model_dump_json(), encoding="utf-8")
+    generation_candidate.write_text(
+        _generation_report(faithfulness=0.5).model_dump_json(), encoding="utf-8"
+    )
+    args = [
+        "evaluation",
+        "regression",
+        "--baseline",
+        str(baseline),
+        "--candidate",
+        str(candidate),
+        "--generation-baseline",
+        str(generation_baseline),
+        "--generation-candidate",
+        str(generation_candidate),
+    ]
+    failed = CliRunner().invoke(app, args)
+    assert failed.exit_code == 1
+    assert "faithfulness regressed" in failed.output

@@ -229,9 +229,10 @@ There is currently no checked-in real-corpus benchmark baseline with repeatable 
 metadata and release thresholds. The checked-in generation evaluation fixture contains only two
 contract-level cases. These tools validate interfaces but do not yet demonstrate production
 quality.
-An offline retrieval regression command compares two complete candidate-bound artifacts for the
-same gold-set version and fails on reviewed quality/latency tolerances. It does not run a model or
-replace the absent real baseline. GitHub Actions runs deterministic Python and browser checks.
+An offline regression command compares complete candidate-bound retrieval artifacts and,
+optionally, per-case generation evaluation reports for the same gold-set version. It fails on
+reviewed quality/latency tolerances, but does not run a model or replace an absent real baseline.
+GitHub Actions runs deterministic Python and browser checks.
 
 ## Dependency direction
 

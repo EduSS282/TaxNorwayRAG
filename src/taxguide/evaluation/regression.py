@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from taxguide.evaluation.generation import GenerationEvaluationReport
 from taxguide.evaluation.retrieval_benchmark import RetrievalEvaluationArtifact
 
 _PIPELINES = {"Dense", "Sparse", "Hybrid", "Hybrid+Reranker"}
@@ -48,4 +49,32 @@ def retrieval_regressions(
             > reference.mean_latency_seconds * limits.max_latency_factor
         ):
             findings.append(f"{pipeline}: mean latency regressed")
+    return findings
+
+
+def generation_regressions(
+    baseline: GenerationEvaluationReport,
+    candidate: GenerationEvaluationReport,
+    *,
+    max_drop: float = 0.05,
+) -> list[str]:
+    """Compare identical judged cases without pretending scores are externally calibrated."""
+    if not 0 <= max_drop <= 1:
+        raise ValueError("max_drop must be between 0 and 1")
+    if baseline.version != candidate.version:
+        raise ValueError("generation reports must use the same gold dataset version")
+    old = {row.case_id: row for row in baseline.rows}
+    new = {row.case_id: row for row in candidate.rows}
+    if len(old) != len(baseline.rows) or len(new) != len(candidate.rows):
+        raise ValueError("generation reports must not contain duplicate case IDs")
+    if old.keys() != new.keys():
+        raise ValueError("generation reports must cover identical case IDs")
+    fields = ("faithfulness", "answer_correctness", "citation_precision", "citation_recall")
+    findings: list[str] = []
+    for case_id in sorted(old):
+        for field in fields:
+            if getattr(old[case_id], field) - getattr(new[case_id], field) > max_drop:
+                findings.append(f"{case_id}: {field} regressed")
+        if old[case_id].abstention_correct and not new[case_id].abstention_correct:
+            findings.append(f"{case_id}: abstention correctness regressed")
     return findings

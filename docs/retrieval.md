@@ -91,6 +91,10 @@ uv run taxguide evaluation regression --baseline baseline.json --candidate candi
 ```
 
 The command requires all four pipelines and checks Recall@5, nDCG@5, and mean latency per mode.
-Default tolerances (absolute 0.05, absolute 0.05, 1.5×) are operator-adjustable and are **not**
-approved release thresholds. It does not compare generation quality or create a baseline. See
+Optional `--generation-baseline` and `--generation-candidate` paths compare identical case IDs
+in serialized `GenerationEvaluationReport` outputs from `evaluate_generation`, including per-case
+faithfulness, correctness, citation scores and abstention correctness. Both reports are required
+together. Default tolerances (absolute 0.05, absolute 0.05, 1.5× for retrieval; absolute 0.05
+for generation scores) are operator-adjustable and are **not** approved release thresholds.
+The command does not create reviewed judgments or a baseline. See
 [private readiness](production-readiness.md).

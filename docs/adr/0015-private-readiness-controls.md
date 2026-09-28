@@ -17,8 +17,9 @@ different trust boundaries; a passing unit suite is not proof of fiscal accuracy
   JSON-encode the remaining evidence in the prompt. Keep exact unmodified chunk text for citation
   validation and abstain if filtering leaves insufficient evidence.
 - Add an explicit offline regression comparison between two candidate-bound retrieval artifacts
-  with the same gold dataset version. Tolerances are operator choices, not universal release
-  targets. The CI suite exercises the comparison with synthetic fixtures only.
+  with the same gold dataset version, and optionally between reviewed generation reports over
+  identical cases. Tolerances are operator choices, not universal release targets. The CI suite
+  exercises comparisons with synthetic fixtures only.
 - Provide a loopback-bound single-host Compose deployment for API, frontend and Qdrant; Ollama,
   llama.cpp, model downloads and networking remain operator managed.
 - Require a reviewed corpus, gold judgments, model/hardware manifest, live retrieval and
@@ -27,6 +28,6 @@ different trust boundaries; a passing unit suite is not proof of fiscal accuracy
 ## Consequences
 
 These controls lower accidental leakage and obvious injection risk, but neither establishes
-semantic faithfulness. The initial regression gate covers retrieval only; a generation-quality
-gate needs reviewed semantic judgments and real model outputs. The Docker deployment is private,
+semantic faithfulness. The generation gate compares supplied scores but needs reviewed semantic
+judgments and real model outputs. The Docker deployment is private,
 not an authenticated public service. No benchmark result is invented when services are offline.
