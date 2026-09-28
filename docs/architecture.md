@@ -24,6 +24,11 @@ taxguide answer   → validated answer, clarification, abstention, or failure
 The FastAPI boundary exposes retrieval, reranking, and grounded answers through separate endpoints.
 It composes existing application services and adds request-scoped trace IDs, JSON access logs, and
 process-local latency metrics. It does not start services or load model weights at import.
+Crawler/source INFO/WARNING logs omit source URLs, local paths, and exception text. Retrieved
+chunks with obvious role/instruction markers are omitted before bounded context selection; the
+remaining exact evidence is JSON-encoded in the prompt and citations are validated afterward.
+This is a conservative defense, not proof of semantic faithfulness; see the
+[threat model](threat-model.md).
 The Next.js App Router frontend is a separate Node process. The browser posts only to its
 same-origin `/api/query`, `/api/retrieve`, `/api/admin`, and `/api/crawl` handlers, which forward JSON to a fixed server-side
 `TAXGUIDE_API_URL`. No Python/domain code is duplicated in the frontend. There is no authenticated
@@ -216,13 +221,17 @@ described as a persistent production cache.
 Unit-tested utilities exist for Recall@K, MRR, nDCG, retrieval latency, citation precision/recall,
 faithfulness, answer correctness, and abstention accuracy. The live retrieval test is opt-in and
 depends on operator-managed services and data. It can produce a candidate-bound evaluation
-artifact, but the repository still lacks a committed real-corpus gold set, hardware manifest,
-release thresholds, and baseline results.
+artifact. A preliminary 30-query retrieval gold set is checked in, but the repository still
+lacks a reviewed representative real-corpus baseline, hardware manifest, release thresholds,
+and benchmark results.
 
 There is currently no checked-in real-corpus benchmark baseline with repeatable hardware/model
 metadata and release thresholds. The checked-in generation evaluation fixture contains only two
 contract-level cases. These tools validate interfaces but do not yet demonstrate production
 quality.
+An offline retrieval regression command compares two complete candidate-bound artifacts for the
+same gold-set version and fails on reviewed quality/latency tolerances. It does not run a model or
+replace the absent real baseline. GitHub Actions runs deterministic Python and browser checks.
 
 ## Dependency direction
 
@@ -248,6 +257,9 @@ ADR 0005.
 The operator's current `configs/base.yaml` selects a remote generator at
 `http://100.112.6.87:8080`, while the other service endpoints remain local. This is a deployment
 choice, not remote process supervision; the API host requires private connectivity to that server.
+`compose.production.yaml` optionally packages API and frontend with local Qdrant for a private
+single-host deployment; model services and network access remain operator managed. It is not a
+public deployment or a benchmark-certified release. See [readiness](production-readiness.md).
 
 ## Known architectural gaps
 

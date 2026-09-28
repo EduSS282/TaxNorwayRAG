@@ -1,0 +1,38 @@
+# Private single-host deployment; combine with compose.yaml for Qdrant.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:8000:8000
+    environment:
+      TAXGUIDE_CONFIG: configs/base.yaml
+      TAXGUIDE_OVERLAY: configs/container.yaml
+      TAXGUIDE_ADMIN_TOKEN: ${TAXGUIDE_ADMIN_TOKEN:-}
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/v1/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:3000:3000
+    environment:
+      TAXGUIDE_API_URL: http://api:8000

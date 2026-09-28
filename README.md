@@ -38,6 +38,9 @@ local question interface, cited sources, tax-year/language controls, and a devel
   start/stop of preconfigured services on the API host.
 - Authenticated crawler page with section selection, verified local capture inventory, bounded
   background downloads, progress and cancellation; indexing remains a separate CLI operation.
+- PII-minimized application logs, conservative retrieved-instruction filtering, and an offline
+  retrieval regression gate; these do not establish answer-level safety or fiscal accuracy.
+- Private single-host Docker Compose files for API, frontend and Qdrant; models remain external.
 
 See [current architecture](docs/architecture.md) for component boundaries and
 [grounded-generation status](docs/generation.md) for the remaining end-to-end work.
@@ -110,7 +113,7 @@ emit an unvalidated model answer.
 With the same external services running, start the loopback-only API:
 
 ```bash
-uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 See [HTTP API and observability](docs/api.md) for requests, configuration, tracing, metrics, and
@@ -223,6 +226,10 @@ Qdrant collection plus the configured model services. See [retrieval](docs/retri
 [grounded generation](docs/generation.md). No reproducible real-corpus baseline is committed yet.
 Candidate indexing, live evaluation artifacts, and reviewed alias promotion/rollback are described
 in [index lifecycle](docs/index-lifecycle.md).
+The artifact regression command is `uv run taxguide evaluation regression --baseline
+path/to/baseline.json --candidate path/to/candidate.json`; it requires a reviewed baseline for
+the same gold-set version. See [private readiness](docs/production-readiness.md). Existing CI
+checks are deterministic and do not run live model benchmarks.
 Named crawl scopes live in [configs/sources.yaml](configs/sources.yaml); URL-only crawls remain
 available under the host/path policy in `configs/base.yaml`. See [crawler](docs/crawler.md).
 The shared catalog has twelve English sections, including abroad/exit tax, employment/pensions,
@@ -241,8 +248,8 @@ catalog changes; downloads still require explicit selection, with at most eight 
   the configured embedding factory and is not persistent.
 - Quote spans are checked for bounds and non-blank source text, but the schema does not carry a
   copied quote for semantic equality checks.
-- Prompt instructions mark retrieved text as untrusted, but prompt isolation is not a complete
-  security boundary; deterministic validation remains mandatory.
+- Obvious retrieved role/instruction payloads are excluded and remaining evidence is JSON-encoded,
+  but prompt isolation is not a complete security boundary; deterministic validation remains mandatory.
 - Context selection budgets chunk tokens and does not yet count rendered metadata, JSON schema, or
   chat-template overhead.
 - Claim-level faithfulness is evaluated only through offline injected evaluators, not enforced by
@@ -264,6 +271,9 @@ contract and its remaining limitations.
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Private release readiness and Docker deployment](docs/production-readiness.md)
+- [RAG threat model](docs/threat-model.md)
+- [Demo and architecture diagram](docs/demo.md)
 - [Open the app: frontend runbook](docs/frontend.md)
 - [HTTP API and observability](docs/api.md)
 - [Local runtime and hardware](docs/local-runtime.md)

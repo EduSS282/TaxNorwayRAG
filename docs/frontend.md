@@ -15,7 +15,7 @@ embeddings, Qdrant y generador. El modo reranked y la comparación requieren ade
 2. Terminal de API, desde la raíz:
 
    ```powershell
-   uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+   uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
    ```
 
    Si usas un overlay, define `$env:TAXGUIDE_OVERLAY = "configs/desktop.yaml"` antes del comando
@@ -157,3 +157,6 @@ servicios y aislamiento de la clave en el proxy. No hay chat persistente, cuenta
 público, descargas de modelos ni control de procesos remotos.
 Los tests del crawler cubren inventario, selección, años, progreso/cancelación, reconexión a trabajo
 activo, errores y vista móvil; usan fixtures, no descargan el sitio oficial ni evalúan respuestas RAG.
+El [despliegue Docker privado](production-readiness.md) compila la misma interfaz y apunta el
+proxy a la API por la red interna de Compose. No inicia modelos ni sustituye los benchmarks
+reales; los tests Playwright siguen usando un upstream determinista.

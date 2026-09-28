@@ -1,0 +1,7 @@
+# Private single-host Compose overlay. Set the generator address in a second
+# operator-owned overlay or in a copy of this file before bringing up the stack.
+corpus:
+  qdrant_url: http://qdrant:6333
+  embedding_base_url: http://host.docker.internal:11434
+retrieval:
+  reranker_base_url: http://host.docker.internal:8001

@@ -53,7 +53,7 @@ terminales en el sobremesa. En la primera, desde la raíz del repositorio:
 
 ```powershell
 uv sync --locked
-uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 En la segunda (Node.js 20.9+; recomendamos la versión 24 usada en CI):
@@ -405,3 +405,6 @@ no es posible comparar de forma fiable un cambio de modelo o de máquina.
 Por estas limitaciones, la arquitectura de tres máquinas debe tratarse como entorno de desarrollo y
 evaluación. El siguiente paso operativo razonable es estabilizar la etapa 1, medirla y mover solo el
 reranker al portátil; Oracle se incorpora después para crawling y copias, no para inferencia.
+El [Compose privado de un solo host](production-readiness.md) es una opción alternativa para API,
+frontend y Qdrant, no una orquestación automática entre estas tres máquinas. Sus URLs de
+`host.docker.internal` requieren adaptación y pruebas antes de mover servicios entre equipos.
