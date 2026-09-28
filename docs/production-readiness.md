@@ -9,10 +9,10 @@ release. The API and query endpoints are unauthenticated; use only loopback/priv
 | --- | --- | --- |
 | #79–#81 | PII-minimized app logs, conservative injection check, threat model and tests | Model/proxy logs and adversarial semantic review are separate |
 | #82 | Retrieval and optional per-case generation artifact comparison with deterministic tests | Reviewed real-case inputs belong to #86 |
-| #83 | GitHub Actions checks Python, browser and Compose syntax | Hosted workflow result after push |
-| #84 | Dockerfiles and private Compose configuration; local image build and API/UI/Qdrant smoke test passed | CI repeats the same no-model deployment path |
+| #83 | GitHub Actions Python, browser, Compose and private deployment jobs passed | CI uses deterministic doubles, not live model evaluation |
+| #84 | Dockerfiles and private Compose configuration; local and GitHub Actions deployment smoke passed, plus local dense retrieval | External model availability is not implied by the deployment smoke |
 | #85, #87 | Current technical runbooks, demo script and architecture diagram | Keep synchronized as functionality changes |
-| #86 | Preliminary checked-in 30-query retrieval gold set; opt-in harness | Live services, reviewed corpus, saved measurements and human release decision |
+| #86 | [Exploratory four-mode live retrieval measurement](evaluation/v1-retrieval-2026-09-28.md) saved for 30 questions | Reviewed gold/corpus baseline, live generation study and human release decision |
 
 ## Build and deploy
 

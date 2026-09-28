@@ -1,0 +1,4 @@
+# Opt-in benchmark override for a CPU-hosted llama.cpp reranker.
+# Do not use this to claim parity with the default 30-second query timeout.
+retrieval:
+  reranker_timeout: 180

@@ -229,7 +229,9 @@ live corpus/model evaluation.
 
 The live retrieval benchmark and grounded-generation smoke test are opt-in and require a populated
 Qdrant collection plus the configured model services. See [retrieval](docs/retrieval.md) and
-[grounded generation](docs/generation.md). No reproducible real-corpus baseline is committed yet.
+[grounded generation](docs/generation.md). An [exploratory 30-query real-service retrieval
+measurement](docs/evaluation/v1-retrieval-2026-09-28.md) is committed, but no reviewed
+production-quality baseline or generation study exists yet.
 Candidate indexing, live evaluation artifacts, and reviewed alias promotion/rollback are described
 in [index lifecycle](docs/index-lifecycle.md).
 The artifact regression command is `uv run taxguide evaluation regression --baseline
@@ -261,8 +263,9 @@ catalog changes; downloads still require explicit selection, with at most eight 
   chat-template overhead.
 - Claim-level faithfulness is evaluated only through offline injected evaluators, not enforced by
   the online validator.
-- The checked-in generation fixture is intentionally small, and the live retrieval benchmark has
-  no committed production-quality corpus, results, thresholds, or hardware manifest.
+- The checked-in generation fixture is intentionally small. The exploratory retrieval run has
+  a hardware manifest, but no frozen production corpus, reviewed judgments, approved thresholds
+  or corresponding real generation-quality study.
 - The crawler does not execute JavaScript, submit forms, enter authenticated areas, or traverse
   interactive wizard branches.
 - Query endpoints have no authentication or rate limiting. There is no distributed tracing

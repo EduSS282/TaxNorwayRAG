@@ -50,7 +50,8 @@ remote-service setup.
 The live harness uses the checked-in 30-query `data/evaluation/retrieval_gold_v1.json` and matches
 results by normalized source URL (scheme/host case, query, fragment, and a trailing slash are
 ignored). This preliminary gold set has not been validated as representative of the deployed
-corpus, and no measured baseline is committed. The harness compares dense, sparse, hybrid, and
+corpus. One [exploratory real-service run](evaluation/v1-retrieval-2026-09-28.md) is committed,
+but no reviewed production baseline exists. The harness compares dense, sparse, hybrid, and
 reranked retrieval with Recall@1/5/10, MRR, graded nDCG@5/10, and latency.
 Repeated chunks from one source URL count as a single document at their first retrieved position;
 all metric cutoffs apply after this stable URL deduplication. Latency includes cold initialization,
@@ -73,6 +74,19 @@ TAXGUIDE_RUN_RETRIEVAL_EVAL=1 uv run pytest -m retrieval_eval -s
 ```
 
 The benchmark never starts services, downloads models, or creates SSH tunnels.
+On a CPU-hosted llama.cpp reranker, a ten-candidate request can exceed the default
+30-second timeout. Set `TAXGUIDE_RETRIEVAL_EVAL_OVERLAY=configs/evaluation-cpu.yaml` to
+measure that slower path without changing the normal API timeout. Treat the resulting latency
+as a deployment limitation; an extended benchmark timeout does not prove that the default
+30-second Hybrid + Rerank query path is available.
+On PowerShell, for a local exploratory run without overwriting the committed artifact:
+
+```powershell
+$env:TAXGUIDE_RUN_RETRIEVAL_EVAL = '1'
+$env:TAXGUIDE_RETRIEVAL_EVAL_OVERLAY = 'configs/evaluation-cpu.yaml'
+$env:TAXGUIDE_RETRIEVAL_EVAL_REPORT = 'data/evaluation/reports/retrieval-local.json'
+uv run pytest -m retrieval_eval -s --no-cov
+```
 
 Promotion requires reviewing the candidate-bound artifact and explicitly passing
 `--evaluation-passed`. The command checks the collection name and presence of Dense, Sparse,

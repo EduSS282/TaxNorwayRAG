@@ -17,17 +17,32 @@ from taxguide.evaluation.retrieval_benchmark import (
 )
 from taxguide.retrieval.factory import create_retriever
 
-pytestmark = pytest.mark.retrieval_eval
 DATASET = Path("data/evaluation/retrieval_gold_v1.json")
 
 
+def _benchmark_settings():
+    overlay = os.getenv("TAXGUIDE_RETRIEVAL_EVAL_OVERLAY")
+    return load_config(Path("configs/base.yaml"), Path(overlay) if overlay else None)
+
+
+def test_benchmark_settings_accept_operator_overlay(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    overlay = tmp_path / "benchmark.yaml"
+    overlay.write_text("retrieval:\n  reranker_timeout: 180\n", encoding="utf-8")
+    monkeypatch.setenv("TAXGUIDE_RETRIEVAL_EVAL_OVERLAY", str(overlay))
+
+    assert _benchmark_settings().retrieval.reranker_timeout == 180
+
+
+@pytest.mark.retrieval_eval
 @pytest.mark.skipif(
     os.getenv("TAXGUIDE_RUN_RETRIEVAL_EVAL") != "1",
     reason="set TAXGUIDE_RUN_RETRIEVAL_EVAL=1",
 )
 def test_live_retrieval_benchmark() -> None:
     dataset = load_dataset(DATASET)
-    settings = load_config(Path("configs/base.yaml"))
+    settings = _benchmark_settings()
     collection = os.getenv("TAXGUIDE_RETRIEVAL_EVAL_COLLECTION")
     if collection:
         settings = settings.model_copy(
