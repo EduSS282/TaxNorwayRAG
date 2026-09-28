@@ -10,7 +10,7 @@ release. The API and query endpoints are unauthenticated; use only loopback/priv
 | #79–#81 | PII-minimized app logs, conservative injection check, threat model and tests | Model/proxy logs and adversarial semantic review are separate |
 | #82 | Retrieval and optional per-case generation artifact comparison with deterministic tests | Reviewed real-case inputs belong to #86 |
 | #83 | GitHub Actions checks Python, browser and Compose syntax | Hosted workflow result after push |
-| #84 | Dockerfiles and private Compose configuration | Build and live container smoke test on an active Docker daemon |
+| #84 | Dockerfiles and private Compose configuration; local image build and API/UI/Qdrant smoke test passed | CI repeats the same no-model deployment path |
 | #85, #87 | Current technical runbooks, demo script and architecture diagram | Keep synchronized as functionality changes |
 | #86 | Preliminary checked-in 30-query retrieval gold set; opt-in harness | Live services, reviewed corpus, saved measurements and human release decision |
 
@@ -32,6 +32,11 @@ address is machine-specific. Qdrant data and crawl artifacts are bind-mounted un
 back them up before upgrades. No models are downloaded or launched by Compose. `/v1/health` only
 proves API liveness; a real query is required to prove dependency readiness. Docker Desktop
 must be running. The frontend is a production build, but this is still a private deployment.
+The API image installs only default dependencies; `sentence-transformers`/PyTorch is an optional
+`local-models` extra for an explicitly in-process deployment. Default external providers need no
+CUDA libraries inside the API container.
+The deployment CI job builds both images and checks API health, UI HTTP access and a
+deterministic clarification through the frontend proxy. It does not test external models.
 
 For the existing desktop + laptop + Oracle split, use
 [the three-machine runbook](three-machine-deployment.md). Do not copy the single-host URLs to

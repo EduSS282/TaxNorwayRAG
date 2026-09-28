@@ -260,7 +260,11 @@ The operator's current `configs/base.yaml` selects a remote generator at
 choice, not remote process supervision; the API host requires private connectivity to that server.
 `compose.production.yaml` optionally packages API and frontend with local Qdrant for a private
 single-host deployment; model services and network access remain operator managed. It is not a
-public deployment or a benchmark-certified release. See [readiness](production-readiness.md).
+public deployment or a benchmark-certified release. Its API image omits the opt-in
+`local-models` extra and uses external Ollama/llama.cpp by default. See
+[readiness](production-readiness.md).
+The deployment smoke path checks container health and a deterministic clarification through the
+UI proxy; it does not imply the external models or fiscal answers are ready.
 
 ## Known architectural gaps
 

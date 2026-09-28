@@ -9,8 +9,8 @@ The optional FastAPI service hosts `Qwen/Qwen3-Reranker-0.6B` using
 Run it on the remote machine from the repository checkout:
 
 ```bash
-uv sync
-uv run uvicorn taxguide.reranking.service:app --host 127.0.0.1 --port 8001
+uv sync --locked --extra local-models
+uv run --extra local-models uvicorn taxguide.reranking.service:app --host 127.0.0.1 --port 8001
 ```
 
 Bind to `127.0.0.1` when accessing the service through an SSH tunnel. The service returns raw

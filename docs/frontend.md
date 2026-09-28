@@ -159,4 +159,5 @@ Los tests del crawler cubren inventario, selección, años, progreso/cancelació
 activo, errores y vista móvil; usan fixtures, no descargan el sitio oficial ni evalúan respuestas RAG.
 El [despliegue Docker privado](production-readiness.md) compila la misma interfaz y apunta el
 proxy a la API por la red interna de Compose. No inicia modelos ni sustituye los benchmarks
-reales; los tests Playwright siguen usando un upstream determinista.
+reales; los tests Playwright siguen usando un upstream determinista. La prueba de despliegue en
+CI verifica el proxy y una aclaración determinista, no inferencia con modelos.

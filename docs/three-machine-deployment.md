@@ -277,8 +277,8 @@ firewall y cambia `reranker_base_url` a esa IP. No lo publiques mediante port fo
 El repositorio también incluye un servicio FastAPI basado en `sentence-transformers`:
 
 ```powershell
-uv sync --locked
-uv run uvicorn taxguide.reranking.service:app --host 127.0.0.1 --port 8001
+uv sync --locked --extra local-models
+uv run --extra local-models uvicorn taxguide.reranking.service:app --host 127.0.0.1 --port 8001
 ```
 
 En ese caso configura `reranker_provider: http`. Esta opción es cómoda para desarrollo, pero
@@ -409,3 +409,5 @@ reranker al portátil; Oracle se incorpora después para crawling y copias, no p
 El [Compose privado de un solo host](production-readiness.md) es una opción alternativa para API,
 frontend y Qdrant, no una orquestación automática entre estas tres máquinas. Sus URLs de
 `host.docker.internal` requieren adaptación y pruebas antes de mover servicios entre equipos.
+La prueba de despliegue Docker en CI usa una aclaración sin modelos; no verifica la conectividad
+entre el sobremesa, el portátil y Oracle ni sustituye el benchmark live.

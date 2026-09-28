@@ -20,7 +20,8 @@ def _load_cross_encoder(model_id: str) -> CrossEncoderModel:
         from sentence_transformers import CrossEncoder
     except ImportError as error:
         raise RuntimeError(
-            "QwenReranker requires the optional 'sentence-transformers' dependency."
+            "QwenReranker requires the optional 'sentence-transformers' dependency; "
+            "use 'uv run --extra local-models ...'."
         ) from error
     return cast(CrossEncoderModel, CrossEncoder(model_id))
 

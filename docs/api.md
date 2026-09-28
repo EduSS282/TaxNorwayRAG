@@ -2,9 +2,10 @@
 
 TaxGuide's FastAPI process is a thin boundary over the existing retrieval, reranking, and
 grounded-generation contracts. Install with `uv sync --locked` and start Qdrant plus the model
-services required by the selected mode. Administration never downloads models (the optional
-in-process sentence-transformers providers may fetch missing weights on first inference). Optional authenticated
-administration can start preconfigured services on the API host; see [runtime management](runtime-management.md).
+services required by the selected mode. Administration never downloads models. The optional
+in-process sentence-transformers providers require `uv sync --locked --extra local-models` and may
+fetch missing weights on first inference. Optional authenticated administration can start
+preconfigured services on the API host; see [runtime management](runtime-management.md).
 
 Start from the repository root, bound to loopback:
 

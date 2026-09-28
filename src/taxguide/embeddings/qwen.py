@@ -36,7 +36,8 @@ def _load_sentence_transformer(model_id: str) -> SentenceTransformerModel:
     except ImportError as error:
         message = (
             "QwenEmbedder requires the optional 'sentence-transformers' dependency. "
-            "Install the embedding dependencies before using it."
+            "Run 'uv sync --locked --extra local-models' and "
+            "'uv run --extra local-models ...' before using it."
         )
         raise RuntimeError(message) from error
 

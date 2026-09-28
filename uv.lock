@@ -1705,9 +1705,13 @@ dependencies = [
     { name = "pyyaml" },
     { name = "qdrant-client" },
     { name = "selectolax" },
-    { name = "sentence-transformers" },
     { name = "typer" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+local-models = [
+    { name = "sentence-transformers" },
 ]
 
 [package.dev-dependencies]
@@ -1728,10 +1732,11 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "qdrant-client", specifier = ">=1.19.0" },
     { name = "selectolax", specifier = ">=0.3,<1" },
-    { name = "sentence-transformers", specifier = ">=6.0.1" },
+    { name = "sentence-transformers", marker = "extra == 'local-models'", specifier = ">=6.0.1" },
     { name = "typer", specifier = ">=0.12,<1" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
 ]
+provides-extras = ["local-models"]
 
 [package.metadata.requires-dev]
 dev = [

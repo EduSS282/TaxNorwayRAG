@@ -24,3 +24,18 @@ def test_cli_entrypoint_is_registered() -> None:
     }
 
     assert entrypoints["taxguide"] == "taxguide.cli.main:app"
+
+
+def test_in_process_models_require_explicit_extra() -> None:
+    package = distribution("taxguide-norway")
+    requirements = package.requires or []
+    assert any(
+        requirement.startswith("sentence-transformers")
+        and "extra == " in requirement
+        and "local-models" in requirement
+        for requirement in requirements
+    )
+    assert not any(
+        requirement.startswith("sentence-transformers") and "extra ==" not in requirement
+        for requirement in requirements
+    )

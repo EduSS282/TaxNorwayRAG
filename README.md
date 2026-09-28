@@ -61,6 +61,12 @@ uv sync --locked
 uv run taxguide --help
 ```
 
+The default installation uses external Ollama/llama.cpp services and does not install PyTorch.
+For the optional in-process `sentence-transformers` embedding/reranking adapters or the
+standalone Python reranker service, use `uv sync --locked --extra local-models` and keep the extra
+in `uv run --extra local-models ...` commands. Switching back to `uv sync --locked` removes that
+extra without changing corpus or index data.
+
 The Python test suite does not require a GPU or live model server. Managed external runtimes
 require weights installed beforehand. The optional in-process sentence-transformers adapters may
 fetch missing weights on first inference; prepare their cache/offline settings separately.
