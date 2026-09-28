@@ -222,9 +222,10 @@ En el portátil, inicia el servicio ligado únicamente a loopback:
 
 ```powershell
 llama-server `
-  -hf ggml-org/Qwen3-reranker-0.6B-Q8_0-GGUF:Q8_0 `
-  --embedding --rerank --pooling rank `
-  --host 127.0.0.1 --port 8001 -ngl 0
+  -hf ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF:Q8_0 `
+  --alias Qwen/Qwen3-Reranker-0.6B --reranking `
+  --host 127.0.0.1 --port 8001 -ngl 0 -c 4096 --parallel 1 `
+  -b 2048 -ub 2048
 ```
 
 Con un servidor SSH habilitado en el portátil, crea el túnel desde el sobremesa:

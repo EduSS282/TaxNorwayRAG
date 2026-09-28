@@ -61,10 +61,16 @@ For the configured 0.6B model, a CPU-first development command is:
 
 ```powershell
 llama-server `
-  -hf ggml-org/Qwen3-reranker-0.6B-Q8_0-GGUF:Q8_0 `
-  --embedding --rerank --pooling rank `
-  --host 127.0.0.1 --port 8001 -ngl 0
+  -hf ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF:Q8_0 `
+  --alias Qwen/Qwen3-Reranker-0.6B --reranking `
+  --host 127.0.0.1 --port 8001 -ngl 0 -c 4096 --parallel 1 `
+  -b 2048 -ub 2048
 ```
+
+The physical batch default can be 512 tokens, smaller than a single candidate under the
+reranker's tokenizer. In that case `/v1/rerank` returns HTTP 500 even though `/health` succeeds;
+the API then returns 503 in Hybrid + Rerank. The explicit `-b`/`-ub` values cover the observed
+case; measure longer inputs before raising them further. Dense mode does not use this service.
 
 Dense, sparse, and hybrid modes do not require this service. There is no automatic fallback when
 reranked mode cannot reach it.
