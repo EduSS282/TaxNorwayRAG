@@ -77,7 +77,7 @@ Activa los perfiles y arranca **un √∫nico worker**, sin `--reload` para operaci√
 
 ```powershell
 $env:TAXGUIDE_LOCAL_SERVICES = "configs/local-services.yaml"
-uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --workers 1
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --workers 1 --no-access-log
 ```
 
 Abre el frontend normalmente y desbloquea `/settings` con tu clave. El frontend/API sigue usando

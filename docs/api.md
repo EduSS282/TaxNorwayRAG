@@ -9,7 +9,7 @@ administration can start preconfigured services on the API host; see [runtime ma
 Start from the repository root, bound to loopback:
 
 ```console
-uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 `TAXGUIDE_CONFIG` selects the base YAML; `TAXGUIDE_OVERLAY` selects an optional overlay. If neither
@@ -18,7 +18,7 @@ For example, on PowerShell:
 
 ```powershell
 $env:TAXGUIDE_OVERLAY = "configs/desktop.yaml"
-uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 The overlay path above is illustrative; create it for your own deployment. The configured Qdrant
@@ -115,6 +115,10 @@ return 409, invalid inputs 422. Jobs do not survive process restart; artifacts d
 
 Each HTTP request emits one JSON log record with method, path, status, duration, request ID, trace
 ID, and timed stage spans. Questions, responses, query strings, and source excerpts are not logged.
+Application crawler/source INFO/WARNING records omit raw URLs, local filenames and exception
+messages; CLI error output and external model-server logs need separate handling.
+Use `--no-access-log` on Uvicorn (as in the startup command above): its own default access log
+is outside this sanitization boundary and may print user-controlled paths or query strings.
 Unknown URL paths are logged as `<other>` to avoid recording user text placed in a path.
 Responses include `X-Request-ID`, `X-Trace-ID`, and W3C `traceparent`; a valid incoming version-00
 `traceparent` continues its trace ID. `/v1/metrics` reports count, cumulative/max latency, and

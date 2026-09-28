@@ -41,5 +41,5 @@ class LocalHtmlSource:
             )
         except (OSError, ValueError) as exc:
             raise DocumentLoadError(f"Cannot load HTML {path}: {exc}") from exc
-        logger.info("document loaded id=%s path=%s", document.id, path)
+        logger.info("document loaded id=%s", document.id)
         return document

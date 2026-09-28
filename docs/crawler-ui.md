@@ -11,7 +11,7 @@ Desde la raíz del repositorio, en la terminal de la API:
 ```powershell
 $crawlerSecret = Read-Host "Clave de administración (mínimo 32 caracteres)" -AsSecureString
 $env:TAXGUIDE_ADMIN_TOKEN = [System.Net.NetworkCredential]::new("", $crawlerSecret).Password
-uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Usa la misma clave de `/settings`, si ya la tienes configurada. No hace falta un perfil de

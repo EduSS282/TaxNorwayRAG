@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -51,6 +52,18 @@ def test_external_seed_is_rejected() -> None:
     crawler = SkatteetatenCrawler(FakeHttp({}))
     with pytest.raises(DisallowedDomainError):
         crawler.crawl(CrawlRequest(url="https://example.com/"))
+
+
+def test_crawl_failure_log_omits_source_url_and_exception_details(tmp_path: Path, caplog) -> None:
+    url = f"{BASE}/en/person/12345678901/"
+    http = FakeHttp({f"{BASE}/robots.txt": robots(), url: response(url, "private", "text/plain")})
+    with caplog.at_level(logging.WARNING, logger="taxguide.crawling.skatteetaten"):
+        result = SkatteetatenCrawler(http, FileCrawlArtifactRepository(tmp_path)).crawl(
+            CrawlRequest(url=url, max_pages=1, follow_links=False)
+        )
+    assert result.failures
+    assert "12345678901" not in caplog.text
+    assert "category=UnsupportedContentTypeError" in caplog.text
 
 
 @pytest.mark.parametrize("max_pages,expected", [(2, [None, 2025]), (3, [None, 2025, 2026])])

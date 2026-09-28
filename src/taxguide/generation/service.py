@@ -14,6 +14,7 @@ from taxguide.generation.abstention import AbstentionPolicy
 from taxguide.generation.base import Generator
 from taxguide.generation.language import ResponseLanguage
 from taxguide.generation.models import RagAnswer
+from taxguide.generation.prompt_safety import exclude_instructional_evidence
 from taxguide.generation.prompts import build_grounded_messages
 from taxguide.generation.validation import CitationValidationError, CitationValidator
 from taxguide.query.tax_year import (
@@ -179,7 +180,7 @@ class GroundedRagService:
         except (TaxguideError, RuntimeError) as error:
             return self._failed(decision, f"retrieval failed: {error}")
 
-        context = self._context_builder.build(results)
+        context = self._context_builder.build(exclude_instructional_evidence(results))
         exposed_context = context if include_context else None
         policy = AbstentionPolicy(minimum_evidence=decision.minimum_evidence)
         if policy.should_abstain(context, citations_valid=True):

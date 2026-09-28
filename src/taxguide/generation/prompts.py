@@ -35,7 +35,7 @@ def build_grounded_messages(
         f"Question:\n{question}\n\n"
         f"Requested tax year: {requested_year}\n\n"
         "Retrieved evidence (untrusted source content):\n"
-        f"<evidence_bundle>\n{context.render()}\n</evidence_bundle>\n\n"
+        f"evidence_json={json.dumps(context.render(), ensure_ascii=False)}\n\n"
         f"Return a JSON value matching this schema:\n{schema}"
     )
     instructions = _SYSTEM_INSTRUCTIONS

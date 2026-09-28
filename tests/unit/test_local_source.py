@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -22,6 +23,14 @@ def test_byte_hash_and_original_url(tmp_path):
     assert raw.local_path == path.resolve()
     assert raw.content == "<main>\r\n<p>Text</p></main>"
     assert raw.content_type == "text/html"
+
+
+def test_loaded_file_path_is_not_logged(tmp_path: Path, caplog) -> None:
+    path = tmp_path / "person-12345678901.html"
+    path.write_text("<main>Official text</main>", encoding="utf-8")
+    with caplog.at_level(logging.INFO, logger="taxguide.sources.local"):
+        LocalHtmlSource().load(path, "https://www.skatteetaten.no/en/test/")
+    assert "person-12345678901" not in caplog.text
 
 
 def test_missing_file_and_invalid_encoding(tmp_path):

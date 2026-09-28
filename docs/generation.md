@@ -98,6 +98,10 @@ is an operational failure rather than an attempt to salvage untrusted prose.
 Evidence is labelled as untrusted source content in both system and user messages. The model is
 instructed never to follow commands embedded in retrieved text. This reduces prompt-injection risk
 but is not treated as a security boundary; deterministic output validation remains authoritative.
+Before context selection, obvious source-text role/instruction markers are omitted. Remaining
+evidence is JSON-encoded in the user message so source text cannot syntactically close a prompt
+delimiter. This conservative filter may miss paraphrases or exclude benign quotations; if too
+little evidence remains, the service abstains. See the [threat model](threat-model.md).
 
 ## Collection lifecycle
 

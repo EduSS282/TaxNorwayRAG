@@ -130,13 +130,13 @@ class SkatteetatenCrawler:
                 self.repository.save(page)
                 pages.append(page)
                 content_ids.setdefault(page.content_sha256, page.document_id)
-                logger.info("page crawled id=%s url=%s", page.document_id, page.final_url)
+                logger.info("page crawled id=%s", page.document_id)
             except RobotsDisallowedError:
-                logger.info("page skipped by robots url=%s", url)
+                logger.info("page skipped by robots")
                 skipped.append(url)
                 continue
             except CrawlerError as exc:
-                logger.warning("crawl failed url=%s error=%s", url, exc)
+                logger.warning("crawl failed category=%s", type(exc).__name__)
                 failures.append(
                     CrawlFailure(
                         url=url,
