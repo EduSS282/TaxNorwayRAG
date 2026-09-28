@@ -47,12 +47,11 @@ remote-service setup.
 
 ## Live retrieval benchmark
 
-The live harness expects a local gold set at `data/evaluation/retrieval_gold_v1.json` and matches
+The live harness uses the checked-in 30-query `data/evaluation/retrieval_gold_v1.json` and matches
 results by normalized source URL (scheme/host case, query, fragment, and a trailing slash are
-ignored). The `data/` directory is ignored by Git, so a fresh checkout does not contain this real
-evaluation corpus and the repository does not yet publish a reproducible baseline. The harness
-compares dense,
-sparse, hybrid, and reranked retrieval with Recall@1/5/10, MRR, graded nDCG@5/10, and latency.
+ignored). This preliminary gold set has not been validated as representative of the deployed
+corpus, and no measured baseline is committed. The harness compares dense, sparse, hybrid, and
+reranked retrieval with Recall@1/5/10, MRR, graded nDCG@5/10, and latency.
 Repeated chunks from one source URL count as a single document at their first retrieved position;
 all metric cutoffs apply after this stable URL deduplication. Latency includes cold initialization,
 including the first embedding request, so the report represents end-to-end user-visible timing.
@@ -84,3 +83,14 @@ Results are exploratory until the gold set, corpus manifest, model revisions/qua
 hardware/runtime manifest, thresholds, and generated report are versioned together. The small
 checked-in fixtures under `tests/fixtures/evaluation/` test metric contracts; they are not evidence
 of real retrieval or generation quality.
+
+Two saved artifacts for the **same** gold-set version can be checked for retrieval regressions:
+
+```bash
+uv run taxguide evaluation regression --baseline baseline.json --candidate candidate.json
+```
+
+The command requires all four pipelines and checks Recall@5, nDCG@5, and mean latency per mode.
+Default tolerances (absolute 0.05, absolute 0.05, 1.5×) are operator-adjustable and are **not**
+approved release thresholds. It does not compare generation quality or create a baseline. See
+[private readiness](production-readiness.md).

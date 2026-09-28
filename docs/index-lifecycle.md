@@ -37,8 +37,9 @@ uv run pytest -m retrieval_eval -s
 
 The JSON report records the candidate collection, gold dataset version, timestamp and metrics for
 Dense, Sparse, Hybrid, and Hybrid+Reranker. It is an evaluation record, not a quality guarantee.
-No real-corpus gold set, hardware manifest, agreed thresholds, or accepted baseline is checked in
-yet. A human must inspect quality and latency before explicitly approving promotion.
+The preliminary 30-query retrieval gold set is checked in, but no reviewed representative
+real-corpus baseline, hardware manifest, agreed thresholds, or accepted benchmark result is
+checked in. A human must inspect quality and latency before explicitly approving promotion.
 
 ## 3. Promote
 
