@@ -6,6 +6,11 @@ not mean they are implemented.
 
 ## System boundary
 
+The public project website in `site/` is static HTML/CSS deployed to GitHub Pages from
+`main`. Its workflow uploads only that directory. It has no API or model connections;
+the Next.js/Python application remains a separate private/local deployment. See
+[GitHub Pages](github-pages.md) for publishing, verification and rollback.
+
 TaxGuide owns deterministic acquisition, document processing, retrieval composition, tax-aware
 routing, and grounded-generation contracts. Qdrant, Ollama, llama.cpp, and optional HTTP model
 services are separate processes. TaxGuide does not install models or create tunnels. An opt-in
