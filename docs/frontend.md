@@ -147,6 +147,10 @@ npx playwright install chromium
 npm test
 ```
 
+En Windows PowerShell, si la política bloquea `npm.ps1` o `npx.ps1`, usa `npm.cmd` y `npx.cmd`
+para los mismos comandos. Ejecuta una sola suite Playwright a la vez: los puertos de prueba
+13000 y 18001 deben estar libres; no reutilices una instancia de la aplicación real.
+
 Playwright usa los puertos loopback 13000 y 18001 y comprueba la UI compilada contra un upstream
 de pruebas: formulario, idioma/año, citas, contexto, comparación, estados vacíos/de error,
 loading, vista móvil y controles del proxy. No se conecta a los modelos reales. Los tests Python

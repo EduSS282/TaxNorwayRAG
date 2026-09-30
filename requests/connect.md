@@ -1,14 +1,14 @@
-ssh -i ".env/ssh-key-2026-09-09.key" \
+ssh -i "PATH_TO_PRIVATE_KEY" \
   -L 11434:localhost:11434 \
   -L 6333:localhost:6333 \
   -L 8001:localhost:8001 \
-  opc@82.70.82.180
+  SSH_USER@VM_HOST
 
-ssh -i "ssh-key-2026-09-09.key" \
+ssh -i "PATH_TO_PRIVATE_KEY" \
   -L 11434:localhost:11434 \
   -L 6333:localhost:6333 \
   -L 8001:localhost:8001 \
-  opc@82.70.82.180
+  SSH_USER@VM_HOST
 
 ./build/bin/llama-server \
   -hf ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF:Q8_0 \

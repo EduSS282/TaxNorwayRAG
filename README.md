@@ -1,13 +1,26 @@
+<p align="center">
+  <img src="docs/assets/taxguide-logo.svg" alt="TaxGuide Norway — official sources, traceable answers" width="720">
+</p>
+
 # TaxGuide Norway
 
-TaxGuide Norway is a modular Python system for acquiring, normalizing, indexing, and retrieving
-official Norwegian tax documentation. The repository currently implements the offline corpus
-pipeline, four retrieval modes, tax-year-aware filtering, deterministic tax routing, and the
-contracts used by grounded generation.
+Explore Norwegian tax guidance with answers grounded in official **Skatteetaten** sources.
+TaxGuide acquires and indexes official documentation, compares four retrieval modes, filters
+evidence by verified tax year, and validates generated citations before displaying an answer.
+Ambiguous questions produce clarification; insufficient evidence produces abstention.
 
 It provides an end-to-end `taxguide answer` command and a FastAPI HTTP boundary over the same
 retrieval, reranking, and grounded-answer services. A Next.js frontend in `frontend/` provides a
 local question interface, cited sources, tax-year/language controls, and a developer inspector.
+
+**Private research preview.** Of 87 GitHub issues, 86 are closed; only
+[#86: v1 evaluation](https://github.com/EduSS282/TaxNorwayRAG/issues/86) remains open as of
+2026-09-30. The live GPU LLM study, reviewed judgments, frozen corpus baseline, and release
+approval remain pending. Deterministic checks do not establish fiscal accuracy.
+See the [repository audit](docs/repository-audit.md) for evidence and remaining gates.
+
+Start with [installation](#installation), [local workflow](#local-workflow), and
+[opening the app](#open-the-app). Operational details live in the linked runbooks.
 
 ## Implemented today
 
@@ -43,7 +56,8 @@ local question interface, cited sources, tax-year/language controls, and a devel
 - Private single-host Docker Compose files for API, frontend and Qdrant; models remain external.
 
 See [current architecture](docs/architecture.md) for component boundaries and
-[grounded-generation status](docs/generation.md) for the remaining end-to-end work.
+[grounded-generation status](docs/generation.md) for the implemented contract and remaining
+evaluation work.
 
 ## Installation
 
@@ -165,23 +179,39 @@ The CLI loads `configs/base.yaml` when it exists in the working directory. `--co
 explicit base file and `--overlay` recursively merges and validates an environment-specific
 overlay. Paths are relative to the working directory.
 
-The checked-in base configuration currently points the generator to the operator's remote
-endpoint `http://100.112.6.87:8080`; embeddings, reranker and Qdrant remain local. The API host
+**Check endpoints before startup.** The checked-in base configuration currently points the
+generator to an operator-specific remote endpoint (see `generation.base_url` in your local configuration);
+embeddings, reranker and Qdrant remain local. The API host
 must be able to reach that private address. For the all-local commands above, override
-`generation.base_url` with `http://127.0.0.1:8080`. See [local runtime](docs/local-runtime.md).
+`generation.base_url` with `http://127.0.0.1:8080`. For example, save `configs/local.yaml`:
+
+```yaml
+generation:
+  base_url: http://127.0.0.1:8080
+```
+
+Use `uv run taxguide answer "Where do I report foreign income?" --overlay configs/local.yaml`.
+For the API, set `$env:TAXGUIDE_OVERLAY = "configs/local.yaml"` in PowerShell before startup.
+Change the model identifier too if your server serves another model.
+See [local runtime](docs/local-runtime.md).
 
 ## Architecture summary
 
-```text
-Offline
-URL → crawler → raw HTML + manifest → parser → normalizer → chunker
-                                                       → embedder → Qdrant
-
-Online retrieval
-question → tax-year resolution → metadata filter → dense/sparse/hybrid → optional reranker
-
-Grounded generation
-retrieved chunks → context builder → grounded prompt → generator → parse/validate → abstain/answer
+```mermaid
+flowchart LR
+    S[Official pages] --> C[Crawler and manifests]
+    C --> P[Parse, normalize, chunk]
+    P --> E[Embeddings]
+    E --> Q[(Qdrant)]
+    B[Browser] --> N[Next.js proxy]
+    N --> A[FastAPI]
+    A --> R[Tax routing and retrieval]
+    Q --> R
+    R --> X[Optional reranker]
+    X --> G[Bounded context and external LLM]
+    R --> G
+    G --> V[Validate or abstain]
+    V --> B
 ```
 
 Primary source directories:
@@ -223,6 +253,8 @@ npx playwright install chromium
 npm test
 ```
 
+On Windows PowerShell with blocked npm scripts, use `npm.cmd` and `npx.cmd` for these commands.
+
 Browser tests run the production UI against a test-only HTTP upstream. Python tests independently
 exercise HTTP → grounded service → prompt with injected model doubles. These checks do not replace
 live corpus/model evaluation.
@@ -245,7 +277,7 @@ The shared catalog has twelve English sections, including abroad/exit tax, emplo
 foreign workers/PAYE, shares, family and tax assessment. Refresh the crawler inventory to see
 catalog changes; downloads still require explicit selection, with at most eight sections per job.
 
-## Current limitations and next milestone
+## Current limitations and deferred work
 
 - Model installation/downloads, corpus indexing, and remote service startup remain operator steps.
   Optional local start/stop requires trusted profiles and one API worker.
@@ -253,8 +285,9 @@ catalog changes; downloads still require explicit selection, with at most eight 
   remain unauthenticated. There is no chat persistence or public deployment.
   Requested answer language is a prompt instruction, not a verified translation; deterministic
   clarification/abstention text remains English and source excerpts are never translated.
-- `CachingBatchingEmbedder` provides process-local batching/cache behavior but is not composed by
-  the configured embedding factory and is not persistent.
+- `CachingBatchingEmbedder` separates document/query vectors by role, model identity, and text.
+  It provides process-local batching/cache behavior but is not composed by the configured
+  embedding factory and is not persistent.
 - Quote spans are checked for bounds and non-blank source text, but the schema does not carry a
   copied quote for semantic equality checks.
 - Obvious retrieved role/instruction payloads are excluded and remaining evidence is JSON-encoded,
@@ -274,12 +307,15 @@ catalog changes; downloads still require explicit selection, with at most eight 
 - TaxGuide provides information from official evidence; it is not a substitute for professional
   tax advice or an eligibility determination.
 
-The next coherent milestones are the persistent role-aware embedding cache and reproducible real
-retrieval/generation benchmarks. See [grounded generation](docs/generation.md) for the implemented
-contract and its remaining limitations.
+The open v1 gate is a reproducible, reviewed retrieval/generation study on the target hardware.
+The exploratory CPU reranker exceeded the normal timeout and did not improve Recall@5 over
+hybrid on the preliminary set; keep dense as the default until evaluation supports another choice.
+Persistent embedding cache integration is deferred work, not a completed feature.
+See [grounded generation](docs/generation.md) for the implemented contract and its limitations.
 
 ## Documentation
 
+- [Repository audit and remaining release gates](docs/repository-audit.md)
 - [Architecture](docs/architecture.md)
 - [Private release readiness and Docker deployment](docs/production-readiness.md)
 - [RAG threat model](docs/threat-model.md)

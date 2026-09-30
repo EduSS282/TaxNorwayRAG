@@ -34,11 +34,12 @@ The default configuration expects:
 | Qdrant | `http://127.0.0.1:6333` | Chunk payload and dense-vector storage |
 | Ollama | `http://127.0.0.1:11434` | `qwen3-embedding:0.6b` embeddings |
 | llama.cpp reranker | `http://127.0.0.1:8001` | `/v1/rerank` |
-| llama.cpp generator | `http://100.112.6.87:8080` | `/v1/chat/completions` grounded generation |
+| llama.cpp generator | Operator-configured `generation.base_url` | `/v1/chat/completions` grounded generation |
 
 The generator address is the operator-selected remote host; port 8080 and the existing model
-alias are unchanged. Start llama-server on that host with `--host 100.112.6.87 --port 8080`,
-provided the address belongs to it, and restrict firewall/private-network access to the API host.
+alias are unchanged. Start llama-server on that host with `--host PRIVATE_BIND_ADDRESS --port 8080`,
+replacing `PRIVATE_BIND_ADDRESS` with its private interface address, and restrict
+firewall/private-network access to the API host.
 The loopback startup example below is for all-local use; set `generation.base_url` back to
 `http://127.0.0.1:8080` for that topology. TaxGuide does not change the remote server binding or
 firewall. Restart the API after YAML changes. A configured overlay or saved `/settings`

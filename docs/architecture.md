@@ -212,18 +212,21 @@ See [grounded generation](generation.md) for the required orchestration and fail
 ## Embedding cache status
 
 `CachingBatchingEmbedder` can batch missing texts and cache vectors in an injected mutable mapping.
-It is not used by `embeddings.factory.create_embedder`, defaults to process memory, exposes no
-metrics, and uses one text/model key shape for both document and query embeddings. It must not be
-described as a persistent production cache.
+It separates document and query cache keys by role, model identity, and text, so adapters with
+different query instructions cannot reuse document vectors. Older unscoped mapping entries are
+ignored and recomputed. It is not used by `embeddings.factory.create_embedder`, defaults to
+process memory, and exposes no metrics. It must not be described as a persistent production cache.
 
 ## Evaluation status
 
 Unit-tested utilities exist for Recall@K, MRR, nDCG, retrieval latency, citation precision/recall,
 faithfulness, answer correctness, and abstention accuracy. The live retrieval test is opt-in and
 depends on operator-managed services and data. It can produce a candidate-bound evaluation
-artifact. A preliminary 30-query retrieval gold set is checked in, but the repository still
-lacks a reviewed representative real-corpus baseline, hardware manifest, release thresholds,
-and benchmark results.
+artifact. A preliminary 30-query retrieval gold set and an
+[exploratory four-mode real-service measurement](evaluation/v1-retrieval-2026-09-28.md) are checked
+in, including CPU/model/runtime metadata. The measurement is not a reviewed release baseline:
+the corpus was not frozen, judgments are preliminary, and approved release thresholds and a live
+generation-quality study remain absent.
 
 There is currently no checked-in real-corpus benchmark baseline with repeatable hardware/model
 metadata and release thresholds. The checked-in generation evaluation fixture contains only two
@@ -255,8 +258,8 @@ model endpoints. A remote VM is suitable for crawling, scheduled work, backups, 
 Qdrant service, but not required for local development. See [local runtime](local-runtime.md) and
 ADR 0005.
 
-The operator's current `configs/base.yaml` selects a remote generator at
-`http://100.112.6.87:8080`, while the other service endpoints remain local. This is a deployment
+The operator's current `configs/base.yaml` selects a remote generator through
+`generation.base_url`, while the other service endpoints remain local. This is a deployment
 choice, not remote process supervision; the API host requires private connectivity to that server.
 `compose.production.yaml` optionally packages API and frontend with local Qdrant for a private
 single-host deployment; model services and network access remain operator managed. It is not a
@@ -270,7 +273,7 @@ UI proxy; it does not imply the external models or fiscal answers are ready.
 
 The grounded CLI milestone is complete, but these gaps remain:
 
-1. integrate a role-aware persistent embedding cache;
+1. integrate a persistent embedding cache (the standalone wrapper already separates roles);
 2. establish real, versioned retrieval and generation baselines with hardware/model manifests;
 3. count complete rendered prompt tokens rather than only chunk tokens;
 4. add a copied quote or claim mapping if exact semantic quote validation is required;

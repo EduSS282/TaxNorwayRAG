@@ -1,3 +1,5 @@
+import pytest
+
 from taxguide.embeddings.cached import CachingBatchingEmbedder
 from taxguide.embeddings.mock import MockEmbedder
 
@@ -34,4 +36,30 @@ def test_cached_batching_embedder_caches_queries() -> None:
     embedder = CachingBatchingEmbedder(delegate)
 
     assert embedder.embed_query("deadline") == embedder.embed_query("deadline")
+    assert delegate.query_calls == ["deadline"]
+
+
+@pytest.mark.parametrize("query_first", [False, True])
+def test_cache_keeps_document_and_query_vectors_separate(query_first: bool) -> None:
+    class RoleAwareEmbedder(RecordingEmbedder):
+        def embed_documents(self, texts: list[str]) -> list[tuple[float, ...]]:
+            self.document_calls.append(texts)
+            return [(1.0, 0.0) for _ in texts]
+
+        def embed_query(self, query: str) -> tuple[float, ...]:
+            self.query_calls.append(query)
+            return (0.0, 1.0)
+
+    delegate = RoleAwareEmbedder()
+    embedder = CachingBatchingEmbedder(delegate)
+    if query_first:
+        embedder.embed_query("deadline")
+    else:
+        embedder.embed_documents(["deadline"])
+
+    assert embedder.embed_documents(["deadline", "deadline"]) == [(1.0, 0.0)] * 2
+    assert embedder.embed_query("deadline") == (0.0, 1.0)
+    assert embedder.embed_documents(["deadline"]) == [(1.0, 0.0)]
+    assert embedder.embed_query("deadline") == (0.0, 1.0)
+    assert delegate.document_calls == [["deadline"]]
     assert delegate.query_calls == ["deadline"]

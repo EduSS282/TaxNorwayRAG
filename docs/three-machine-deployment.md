@@ -42,9 +42,10 @@ LLM de 4B.
 
 ## Abrir la app en sobremesa y portátil
 
-La configuración base actual apunta el LLM a `http://100.112.6.87:8080`; los demás servicios siguen
-locales. La máquina de Python debe alcanzar esa dirección privada. En el equipo del LLM, sirve
-con `--host 100.112.6.87 --port 8080` (si esa IP le pertenece) y permite acceso solo desde el host
+La configuración base actual apunta el LLM al endpoint remoto de `generation.base_url`;
+los demás servicios siguen locales. La máquina de Python debe alcanzar ese endpoint privado.
+En el equipo del LLM, sirve con `--host DIRECCION_PRIVADA_LLM --port 8080`, sustituyendo
+`DIRECCION_PRIVADA_LLM` por la dirección de su interfaz privada, y permite acceso solo desde el host
 de la API mediante firewall/red privada. No basta con escuchar en `127.0.0.1`. Para ejecutar todo
 en una sola máquina, restaura `generation.base_url: http://127.0.0.1:8080` en tu configuración.
 
@@ -398,7 +399,8 @@ no es posible comparar de forma fiable un cambio de modelo o de máquina.
   Úsala en local o mediante un túnel privado. La interfaz no descarga modelos ni los inicia
   en otra máquina: si Python corre en el sobremesa y navegas desde el portátil, «local» es el
   sobremesa. Qdrant en Oracle se configura mediante el endpoint/túnel autorizado y se arranca allí.
-- El cache de embeddings es local al proceso, no persistente y no está compuesto por la factory.
+- El cache de embeddings separa consultas y documentos, pero es local al proceso, no persistente
+  y no está compuesto por la factory.
 - No hay un benchmark real de corpus/generación con umbrales de release comprometido al repositorio.
 - El servicio remoto de reranking no tiene autenticación propia.
 - El despliegue distribuido depende de direcciones estáticas o túneles administrados por el operador.
@@ -411,3 +413,6 @@ frontend y Qdrant, no una orquestación automática entre estas tres máquinas. 
 `host.docker.internal` requieren adaptación y pruebas antes de mover servicios entre equipos.
 La prueba de despliegue Docker en CI usa una aclaración sin modelos; no verifica la conectividad
 entre el sobremesa, el portátil y Oracle ni sustituye el benchmark live.
+La [medición exploratoria de retrieval](evaluation/v1-retrieval-2026-09-28.md) usa servicios reales
+en CPU; no incluye generación con el LLM en GPU ni aprobación de release. El
+[audit del repositorio](repository-audit.md) registra las pruebas deterministas y el issue #86 pendiente.

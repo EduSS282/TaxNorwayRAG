@@ -153,7 +153,8 @@ must still be created and reviewed separately; the two-case fixture is not a pro
 - Router topic/audience decisions are recorded, but the grounded service currently applies only
   the safe populated tax-year filter; corpus enrichment must precede stricter topic/audience
   filtering to avoid false-empty retrieval.
-- The embedding cache is process-local, not integrated by the factory, and not persistent.
+- The standalone embedding cache separates query/document roles, but is process-local, not
+  integrated by the factory, and not persistent.
 - No reproducible real-corpus retrieval/generation baseline or release threshold is committed.
 - The HTTP API exposes the same grounded service at `/v1/query`, without query authentication
   or automatic fallback; use loopback or a private gateway. Optional authenticated runtime

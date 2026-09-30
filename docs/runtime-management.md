@@ -24,10 +24,11 @@ Los destinos del YAML base/overlay quedan autorizados inicialmente. Para poder s
 servidores desde la web, autoriza previamente sus orígenes exactos, separados por comas:
 
 ```powershell
-$env:TAXGUIDE_SERVICE_ORIGINS = "http://192.168.1.10:8080,http://192.168.1.20:8001"
+$env:TAXGUIDE_SERVICE_ORIGINS = "http://generator.example.invalid:8080,http://reranker.example.invalid:8001"
 ```
 
-Usa tus direcciones reales. `localhost` y `127.0.0.1` son entradas distintas. Solo se admiten URLs
+Los nombres `.invalid` son marcadores; sustitúyelos por tus destinos privados reales.
+`localhost` y `127.0.0.1` son entradas distintas. Solo se admiten URLs
 HTTP(S) sin credenciales, rutas (tampoco `/v1`), query o fragmento. La allowlist es intencional:
 el panel no puede convertir el backend en un cliente HTTP hacia cualquier destino. Debe contener
 servicios de confianza; los nombres DNS y su resolución también son responsabilidad del operador.

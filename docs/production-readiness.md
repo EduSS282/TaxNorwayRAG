@@ -5,6 +5,10 @@ release. The API and query endpoints are unauthenticated; use only loopback/priv
 
 ## Milestone status
 
+The 2026-09-30 [repository audit](repository-audit.md) confirms 86 closed issues and only
+[#86](https://github.com/EduSS282/TaxNorwayRAG/issues/86) open. Closed implementation issues do not
+replace the reviewed live evaluation and release evidence below.
+
 | Issue | Current evidence | Remaining gate |
 | --- | --- | --- |
 | #79–#81 | PII-minimized app logs, conservative injection check, threat model and tests | Model/proxy logs and adversarial semantic review are separate |

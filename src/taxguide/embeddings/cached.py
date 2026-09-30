@@ -1,13 +1,14 @@
 """Batching and cache support for any embedding adapter."""
 
 from collections.abc import MutableMapping
+from typing import Literal
 
 from taxguide.embeddings.base import Embedder, Embedding, EmbeddingBatch
 from taxguide.ingestion.hashing import hash_text
 
 
 class CachingBatchingEmbedder:
-    """Wrap an embedder to cache text vectors and bound provider batch size."""
+    """Cache vectors separately by role and bound provider batch size."""
 
     def __init__(
         self,
@@ -31,7 +32,7 @@ class CachingBatchingEmbedder:
         return self._delegate.dimension
 
     def embed_documents(self, texts: list[str]) -> EmbeddingBatch:
-        keys = [self._key(text) for text in texts]
+        keys = [self._key(text, role="document") for text in texts]
         missing = {
             key: text for key, text in zip(keys, texts, strict=True) if key not in self._cache
         }
@@ -46,10 +47,10 @@ class CachingBatchingEmbedder:
         return [self._cache[key] for key in keys]
 
     def embed_query(self, query: str) -> Embedding:
-        key = self._key(query)
+        key = self._key(query, role="query")
         if key not in self._cache:
             self._cache[key] = self._delegate.embed_query(query)
         return self._cache[key]
 
-    def _key(self, text: str) -> str:
-        return hash_text(f"{self.model_id}:{text}")
+    def _key(self, text: str, *, role: Literal["document", "query"]) -> str:
+        return hash_text(f"{role}:{self.model_id}:{text}")
