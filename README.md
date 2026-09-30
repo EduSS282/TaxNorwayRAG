@@ -4,6 +4,12 @@
 
 # TaxGuide Norway
 
+[Project website](https://eduss282.github.io/TaxNorwayRAG/) ·
+[GitHub Pages deployment](docs/github-pages.md)
+
+The public website presents the project and links to its documentation. The interactive
+application runs separately with the local/private services described below.
+
 Explore Norwegian tax guidance with answers grounded in official **Skatteetaten** sources.
 TaxGuide acquires and indexes official documentation, compares four retrieval modes, filters
 evidence by verified tax year, and validates generated citations before displaying an answer.
