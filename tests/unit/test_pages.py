@@ -50,3 +50,11 @@ def test_pages_is_static_and_explains_research_boundary() -> None:
     assert "not hosted on GitHub Pages" in html
     assert "do not establish fiscal accuracy" in html
     assert "<script" not in html and "<form" not in html
+
+
+def test_pages_uses_the_repository_logo_unchanged() -> None:
+    original = ROOT / "docs/assets/taxguide-logo.svg"
+    published = SITE / "assets/taxguide-logo.svg"
+    assert published.read_bytes() == original.read_bytes()
+    html = (SITE / "index.html").read_text(encoding="utf-8")
+    assert 'src="assets/taxguide-logo.svg"' in html
