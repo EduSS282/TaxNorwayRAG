@@ -6,6 +6,10 @@ dependencies, JavaScript, analytics, model calls or external font requests. The 
 copy follows the repository documentation. It presents implemented capabilities and links
 to the runbooks on GitHub; it is not a hosted tax question interface.
 
+The header uses the repository's original `docs/assets/taxguide-logo.svg`, copied unchanged
+to `site/assets/taxguide-logo.svg` for the isolated Pages artifact. When changing the logo,
+update both copies; a regression test checks their byte-for-byte equality.
+
 ## Deployment
 
 In GitHub, open **Settings → Pages → Build and deployment → Source → GitHub Actions**.
