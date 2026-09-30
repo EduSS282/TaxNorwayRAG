@@ -1,0 +1,336 @@
+<p align="center">
+  <img src="docs/assets/taxguide-logo.svg" alt="TaxGuide Norway — official sources, traceable answers" width="720">
+</p>
+
+# TaxGuide Norway
+
+Explore Norwegian tax guidance with answers grounded in official **Skatteetaten** sources.
+TaxGuide acquires and indexes official documentation, compares four retrieval modes, filters
+evidence by verified tax year, and validates generated citations before displaying an answer.
+Ambiguous questions produce clarification; insufficient evidence produces abstention.
+
+It provides an end-to-end `taxguide answer` command and a FastAPI HTTP boundary over the same
+retrieval, reranking, and grounded-answer services. A Next.js frontend in `frontend/` provides a
+local question interface, cited sources, tax-year/language controls, and a developer inspector.
+
+**Private research preview.** Of 87 GitHub issues, 86 are closed; only
+[#86: v1 evaluation](https://github.com/EduSS282/TaxNorwayRAG/issues/86) remains open as of
+2026-09-30. The live GPU LLM study, reviewed judgments, frozen corpus baseline, and release
+approval remain pending. Deterministic checks do not establish fiscal accuracy.
+See the [repository audit](docs/repository-audit.md) for evidence and remaining gates.
+
+Start with [installation](#installation), [local workflow](#local-workflow), and
+[opening the app](#open-the-app). Operational details live in the linked runbooks.
+
+## Implemented today
+
+- bounded crawling of public `skatteetaten.no` HTML, with named source policies, capture
+  manifests, and duplicate detection;
+- domain/path-constrained crawling with robots and bounded `Retry-After` handling, plus source
+  change detection across recrawls;
+- HTML parsing, normalization, and deterministic document/version identities;
+- fixed-token, recursive, and structural chunking;
+- Ollama and local `sentence-transformers` embedding adapters;
+- Qdrant indexing and dense retrieval;
+- in-memory BM25 sparse retrieval, reciprocal-rank fusion, and Qwen reranking;
+- strict pre-ranking tax-year filters and cross-year result validation;
+- explicit annual-rate crawling (`--year`), checked against the fetched official year selector;
+- deterministic topic, intent, risk, and route classification;
+- multilingual deterministic routing with explicit uncertain-scope clarification and independent
+  eligibility/amount risk checks; see [routing](docs/routing.md);
+- automatic creation and schema validation of the Qdrant collection during indexed corpus builds;
+- incremental indexing that verifies chunk identities, content hashes, and index settings,
+  retires obsolete document points, and supports candidate promotion/rollback through Qdrant aliases;
+- bounded generation context, OpenAI-compatible local generation, Pydantic JSON parsing, citation,
+  quote-span and tax-year validation, explicit application statuses, and safe abstention;
+- unit/integration evaluation utilities and an opt-in live retrieval benchmark harness.
+- FastAPI retrieval, reranking, query, health/version, and process-local observability endpoints.
+- Next.js UI with English, Norwegian Bokmål and Spanish labels, requested answer language,
+  four-stage retrieval comparison, and opt-in inspection of the actual final answer context.
+- Opt-in operator settings for saved model/Qdrant connections, dependency checks, and safe
+  start/stop of preconfigured services on the API host.
+- Authenticated crawler page with section selection, verified local capture inventory, bounded
+  background downloads, progress and cancellation; indexing remains a separate CLI operation.
+- PII-minimized application logs, conservative retrieved-instruction filtering, and an offline
+  retrieval/generation report regression gate; these do not establish fiscal accuracy.
+- Private single-host Docker Compose files for API, frontend and Qdrant; models remain external.
+
+See [current architecture](docs/architecture.md) for component boundaries and
+[grounded-generation status](docs/generation.md) for the implemented contract and remaining
+evaluation work.
+
+## Installation
+
+Requirements:
+
+- Python 3.12+ and [uv](https://docs.astral.sh/uv/getting-started/installation/);
+- Docker for the provided local Qdrant service;
+- Ollama when using the default embedding configuration;
+- a separately managed reranker service for `--mode reranked`.
+
+From the repository root:
+
+```bash
+uv sync --locked
+uv run taxguide --help
+```
+
+The default installation uses external Ollama/llama.cpp services and does not install PyTorch.
+For the optional in-process `sentence-transformers` embedding/reranking adapters or the
+standalone Python reranker service, use `uv sync --locked --extra local-models` and keep the extra
+in `uv run --extra local-models ...` commands. Switching back to `uv sync --locked` removes that
+extra without changing corpus or index data.
+
+The Python test suite does not require a GPU or live model server. Managed external runtimes
+require weights installed beforehand. The optional in-process sentence-transformers adapters may
+fetch missing weights on first inference; prepare their cache/offline settings separately.
+
+## Local workflow
+
+Start Qdrant and Ollama, then pull the default embedding model:
+
+```bash
+docker compose up -d qdrant
+ollama pull qwen3-embedding:0.6b
+```
+
+The first indexed corpus build creates the configured cosine collection using the embedder's
+reported dimension. Existing collections are validated before any upsert. Follow
+[local runtime](docs/local-runtime.md) for model processes, hardware allocation, and security notes.
+
+Acquire and inspect official pages:
+
+```bash
+uv run taxguide crawl --source skatteetaten-tax-return-en --max-pages 25 --max-depth 2
+uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --dry-run
+uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --index
+```
+
+Compare retrieval modes against the same indexed collection:
+
+For annual amounts, first acquire and index annual rate pages: ordinary guidance URLs usually
+have no verified tax year. Follow [annual corpus and build performance](docs/annual-corpus.md).
+Build reports include verified document-year counts and stage timings. Local Qdrant/Ollama use
+`127.0.0.1` in `configs/base.yaml` to avoid Windows localhost/IPv6 connection fallback delays.
+
+```bash
+uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mode dense --limit 5
+uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mode sparse --limit 5
+uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mode hybrid --limit 5
+uv run taxguide retrieve "What is the minimum standard deduction for 2025?" --mode reranked --candidate-limit 10 --limit 5
+```
+
+With the generator running at the configured OpenAI-compatible endpoint:
+
+```bash
+uv run taxguide answer "What is the minimum standard deduction for 2025?" --mode hybrid
+uv run taxguide answer "Where do I report foreign income?" --tax-year 2025 --mode reranked --json
+```
+
+`answer` returns one of `answered`, `clarification_required`, `abstained`, or `failed`. It does not
+emit an unvalidated model answer.
+
+With the same external services running, start the loopback-only API:
+
+```bash
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+See [HTTP API and observability](docs/api.md) for requests, configuration, tracing, metrics, and
+security boundaries. Do not expose the unauthenticated API to the public Internet.
+
+### Open the app
+
+With the API running, open another terminal (Node.js 20.9+ required; Node 24 used in CI):
+
+```console
+cd frontend
+npm ci
+npm run dev
+```
+
+Open **http://127.0.0.1:3000**. No models are downloaded by the frontend. For a usable answer, first
+prepare the indexed corpus and model services above. The default mode is dense; the inspector
+requires the reranker as well. See the [frontend runbook](docs/frontend.md) for complete local
+startup, errors and production builds, and [three-machine deployment](docs/three-machine-deployment.md)
+to open the desktop-hosted app from the laptop through a private tunnel.
+
+Open **http://127.0.0.1:3000/settings** for connections and local services. Administration is
+disabled until the API has an operator key; executable/model paths must be configured in a trusted
+local profile. Follow [runtime management](docs/runtime-management.md) for first-time setup.
+“Local” means the Python API machine, not the browser machine. Model downloads and corpus indexing
+remain manual; remote endpoints can be used and checked, but not remotely started or stopped.
+
+Open **http://127.0.0.1:3000/crawler** to select official sections and inspect existing downloads.
+It uses the same operator key, downloads on the API machine, and needs no model services.
+Downloaded pages are not proof of complete coverage or indexing. See [crawler UI](docs/crawler-ui.md)
+for startup, annual-rate selection, progress, cancellation and the subsequent corpus build.
+
+The CLI also supports direct local-file ingestion and chunk inspection:
+
+```bash
+uv run taxguide parse tests/fixtures/html/skatteetaten_basic.html --url "https://www.skatteetaten.no/en/example"
+uv run taxguide inspect tests/fixtures/html/skatteetaten_nested_headings.html --url "https://www.skatteetaten.no/en/example"
+uv run taxguide parse tests/fixtures/html/skatteetaten_basic.html --url "https://www.skatteetaten.no/en/example" --json > normalized-example.json
+uv run taxguide chunk normalized-example.json --strategy structural
+```
+
+The CLI loads `configs/base.yaml` when it exists in the working directory. `--config` selects an
+explicit base file and `--overlay` recursively merges and validates an environment-specific
+overlay. Paths are relative to the working directory.
+
+**Check endpoints before startup.** The checked-in base configuration currently points the
+generator to an operator-specific remote endpoint (see `generation.base_url` in your local configuration);
+embeddings, reranker and Qdrant remain local. The API host
+must be able to reach that private address. For the all-local commands above, override
+`generation.base_url` with `http://127.0.0.1:8080`. For example, save `configs/local.yaml`:
+
+```yaml
+generation:
+  base_url: http://127.0.0.1:8080
+```
+
+Use `uv run taxguide answer "Where do I report foreign income?" --overlay configs/local.yaml`.
+For the API, set `$env:TAXGUIDE_OVERLAY = "configs/local.yaml"` in PowerShell before startup.
+Change the model identifier too if your server serves another model.
+See [local runtime](docs/local-runtime.md).
+
+## Architecture summary
+
+```mermaid
+flowchart LR
+    S[Official pages] --> C[Crawler and manifests]
+    C --> P[Parse, normalize, chunk]
+    P --> E[Embeddings]
+    E --> Q[(Qdrant)]
+    B[Browser] --> N[Next.js proxy]
+    N --> A[FastAPI]
+    A --> R[Tax routing and retrieval]
+    Q --> R
+    R --> X[Optional reranker]
+    X --> G[Bounded context and external LLM]
+    R --> G
+    G --> V[Validate or abstain]
+    V --> B
+```
+
+Primary source directories:
+
+```text
+src/taxguide/crawling/     Bounded acquisition and crawl artifacts
+src/taxguide/ingestion/    Parsing, normalization, and ingestion orchestration
+src/taxguide/chunking/     Deterministic chunking strategies
+src/taxguide/embeddings/   Embedding contracts and adapters
+src/taxguide/vectorstores/ Qdrant adapter
+src/taxguide/retrieval/    Dense, sparse, hybrid, and temporal retrieval
+src/taxguide/reranking/    Local, HTTP, and llama.cpp rerankers
+src/taxguide/query/        Intent, risk, and tax-year resolution
+src/taxguide/rules/        Deterministic routing decisions
+src/taxguide/context/      Bounded generation context
+src/taxguide/generation/   Generation contracts, prompts, citations, and validation
+src/taxguide/evaluation/   Retrieval and generation metrics
+src/taxguide/api/          HTTP boundary and observability
+src/taxguide/runtime/      Operator connections and owned local-service lifecycle
+frontend/                 Next.js UI and fixed-destination API proxy
+```
+
+## Verification
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src
+```
+
+Frontend checks (from `frontend/`):
+
+```console
+npm ci
+npm run typecheck
+npm run build
+npx playwright install chromium
+npm test
+```
+
+On Windows PowerShell with blocked npm scripts, use `npm.cmd` and `npx.cmd` for these commands.
+
+Browser tests run the production UI against a test-only HTTP upstream. Python tests independently
+exercise HTTP → grounded service → prompt with injected model doubles. These checks do not replace
+live corpus/model evaluation.
+
+The live retrieval benchmark and grounded-generation smoke test are opt-in and require a populated
+Qdrant collection plus the configured model services. See [retrieval](docs/retrieval.md) and
+[grounded generation](docs/generation.md). An [exploratory 30-query real-service retrieval
+measurement](docs/evaluation/v1-retrieval-2026-09-28.md) is committed, but no reviewed
+production-quality baseline or generation study exists yet.
+Candidate indexing, live evaluation artifacts, and reviewed alias promotion/rollback are described
+in [index lifecycle](docs/index-lifecycle.md).
+The artifact regression command is `uv run taxguide evaluation regression --baseline
+path/to/baseline.json --candidate path/to/candidate.json`; it requires a reviewed baseline for
+the same gold-set version. Optional `--generation-baseline` and `--generation-candidate` compare
+reviewed per-case generation reports too. See [private readiness](docs/production-readiness.md). Existing CI
+checks are deterministic and do not run live model benchmarks.
+Named crawl scopes live in [configs/sources.yaml](configs/sources.yaml); URL-only crawls remain
+available under the host/path policy in `configs/base.yaml`. See [crawler](docs/crawler.md).
+The shared catalog has twelve English sections, including abroad/exit tax, employment/pensions,
+foreign workers/PAYE, shares, family and tax assessment. Refresh the crawler inventory to see
+catalog changes; downloads still require explicit selection, with at most eight sections per job.
+
+## Current limitations and deferred work
+
+- Model installation/downloads, corpus indexing, and remote service startup remain operator steps.
+  Optional local start/stop requires trusted profiles and one API worker.
+- The UI is local/private. Only runtime administration has operator authentication; query endpoints
+  remain unauthenticated. There is no chat persistence or public deployment.
+  Requested answer language is a prompt instruction, not a verified translation; deterministic
+  clarification/abstention text remains English and source excerpts are never translated.
+- `CachingBatchingEmbedder` separates document/query vectors by role, model identity, and text.
+  It provides process-local batching/cache behavior but is not composed by the configured
+  embedding factory and is not persistent.
+- Quote spans are checked for bounds and non-blank source text, but the schema does not carry a
+  copied quote for semantic equality checks.
+- Obvious retrieved role/instruction payloads are excluded and remaining evidence is JSON-encoded,
+  but prompt isolation is not a complete security boundary; deterministic validation remains mandatory.
+- Context selection budgets chunk tokens and does not yet count rendered metadata, JSON schema, or
+  chat-template overhead.
+- Claim-level faithfulness is evaluated only through offline injected evaluators, not enforced by
+  the online validator.
+- The checked-in generation fixture is intentionally small. The exploratory retrieval run has
+  a hardware manifest, but no frozen production corpus, reviewed judgments, approved thresholds
+  or corresponding real generation-quality study.
+- The crawler does not execute JavaScript, submit forms, enter authenticated areas, or traverse
+  interactive wizard branches.
+- Query endpoints have no authentication or rate limiting. There is no distributed tracing
+  exporter; operator dependency probes are basic checks, not end-to-end readiness guarantees.
+  Bind to loopback or use an authenticated private gateway.
+- TaxGuide provides information from official evidence; it is not a substitute for professional
+  tax advice or an eligibility determination.
+
+The open v1 gate is a reproducible, reviewed retrieval/generation study on the target hardware.
+The exploratory CPU reranker exceeded the normal timeout and did not improve Recall@5 over
+hybrid on the preliminary set; keep dense as the default until evaluation supports another choice.
+Persistent embedding cache integration is deferred work, not a completed feature.
+See [grounded generation](docs/generation.md) for the implemented contract and its limitations.
+
+## Documentation
+
+- [Repository audit and remaining release gates](docs/repository-audit.md)
+- [Architecture](docs/architecture.md)
+- [Private release readiness and Docker deployment](docs/production-readiness.md)
+- [RAG threat model](docs/threat-model.md)
+- [Demo and architecture diagram](docs/demo.md)
+- [Open the app: frontend runbook](docs/frontend.md)
+- [HTTP API and observability](docs/api.md)
+- [Local runtime and hardware](docs/local-runtime.md)
+- [Connections and local-service controls](docs/runtime-management.md)
+- [Desktop, laptop, and Oracle deployment](docs/three-machine-deployment.md)
+- [Grounded generation status](docs/generation.md)
+- [Crawler](docs/crawler.md)
+- [Crawler page and local inventory](docs/crawler-ui.md)
+- [Corpus workflow](docs/corpus.md)
+- [Retrieval and evaluation](docs/retrieval.md)
+- [Candidate index lifecycle](docs/index-lifecycle.md)
+- [Tax routing](docs/routing.md)
+- [Reranker service](docs/reranker-service.md)
+- [Architecture reference](Design/norway_tax_rag_architecture.md)

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "nested-headings",
+    "title": "Tax return",
+    "language": "en",
+    "sections": [
+      {"heading": "Tax return", "level": 1, "paragraphs": []},
+      {"heading": "Bank and loans", "level": 2, "paragraphs": []},
+      {
+        "heading": "Foreign accounts",
+        "level": 3,
+        "paragraphs": ["Report the bank name and the balance for each foreign account."]
+      }
+    ],
+    "expected_paths": [["Tax return", "Bank and loans", "Foreign accounts"]]
+  },
+  {
+    "id": "paragraph-boundaries",
+    "title": "Deductions",
+    "language": "en",
+    "sections": [
+      {
+        "heading": "Travel expenses",
+        "level": 2,
+        "paragraphs": [
+          "Keep receipts for eligible travel expenses.",
+          "Check the annual threshold before claiming a deduction."
+        ]
+      }
+    ],
+    "expected_paths": [["Deductions", "Travel expenses"]]
+  },
+  {
+    "id": "list-semantics",
+    "title": "Bank details",
+    "language": "en",
+    "sections": [
+      {
+        "heading": "Checklist",
+        "level": 2,
+        "paragraphs": ["- Bank name\n- Account balance\n- Currency"]
+      }
+    ],
+    "expected_paths": [["Bank details", "Checklist"]]
+  }
+]

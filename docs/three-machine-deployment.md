@@ -1,0 +1,418 @@
+# Ejecución distribuida en sobremesa, portátil y Oracle Free Tier
+
+Esta guía convierte la arquitectura actual de TaxGuide Norway en un despliegue operativo para el
+hardware disponible:
+
+- sobremesa: GTX 1060 con 6 GB de VRAM y 32 GB de RAM DDR4;
+- portátil: Intel i7-13700H y 16 GB de RAM DDR5;
+- Oracle Free Tier: 2 OCPU y 12 GB de RAM.
+
+La CLI `taxguide`, la API FastAPI y la interfaz Next.js son puntos de entrada implementados. Las consultas de la API carecen
+de autenticación; administración de servicios/crawler exige clave. Usa loopback o una pasarela privada autenticada. Qdrant, Ollama y
+llama.cpp son procesos externos que TaxGuide consume por HTTP.
+
+## Decisión recomendada
+
+Empieza con el camino interactivo completo en el sobremesa y usa las otras máquinas para descargar
+trabajo auxiliar. Esta distribución minimiza la latencia y evita que una caída de Internet impida
+responder preguntas locales.
+
+| Máquina | Responsabilidad recomendada | Procesos |
+| --- | --- | --- |
+| Sobremesa | Orquestación y respuesta interactiva | TaxGuide CLI/API, Next.js, Qdrant, embeddings y generador |
+| Portátil | Navegador, desarrollo, pruebas y reranking opcional | túnel SSH, repositorio, pruebas, llama.cpp reranker en CPU |
+| Oracle VM | Trabajo persistente no interactivo | crawling programado, informes, sincronización y copias |
+
+```text
+                    trabajo offline
+Oracle VM ──crawl/manifests──► sobremesa ──embed/index──► Qdrant
+                                  │                         │
+                                  │ consulta                │ evidencia
+                                  ▼                         │
+                    TaxGuide CLI/API ◄──────────────────────┘
+                          │       │
+                          │       └──► llama.cpp 4B, GTX 1060 ──► respuesta estructurada
+                          │
+                          └──► portátil, reranker 0.6B CPU (opcional)
+```
+
+No pongas la VM en el camino crítico de una consulta. Dos OCPU son adecuados para crawling lento,
+automatización y coordinación, pero no para servir de forma interactiva embeddings, reranking o un
+LLM de 4B.
+
+## Abrir la app en sobremesa y portátil
+
+La configuración base actual apunta el LLM al endpoint remoto de `generation.base_url`;
+los demás servicios siguen locales. La máquina de Python debe alcanzar ese endpoint privado.
+En el equipo del LLM, sirve con `--host DIRECCION_PRIVADA_LLM --port 8080`, sustituyendo
+`DIRECCION_PRIVADA_LLM` por la dirección de su interfaz privada, y permite acceso solo desde el host
+de la API mediante firewall/red privada. No basta con escuchar en `127.0.0.1`. Para ejecutar todo
+en una sola máquina, restaura `generation.base_url: http://127.0.0.1:8080` en tu configuración.
+
+Primero prepara corpus, Qdrant y modelos siguiendo la etapa 1 de esta guía. Después mantén dos
+terminales en el sobremesa. En la primera, desde la raíz del repositorio:
+
+```powershell
+uv sync --locked
+uv run uvicorn taxguide.api.app:app --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+En la segunda (Node.js 20.9+; recomendamos la versión 24 usada en CI):
+
+```powershell
+cd frontend
+npm ci
+npm run build
+npm start
+```
+
+Abre **http://127.0.0.1:3000** en el sobremesa. Para desarrollo con recarga, usa `npm run dev` en
+lugar de `npm run build`/`npm start`. La interfaz llama a la API local del sobremesa; no necesita
+URLs de Qdrant o modelos en el navegador. Véase [guía de la interfaz](frontend.md).
+
+Para usarla desde el portátil, el sobremesa debe tener un servidor SSH configurado, autenticación
+por clave y acceso por red privada. En el portátil, sustituye usuario y dirección:
+
+```powershell
+ssh -N -L 3000:127.0.0.1:3000 USUARIO@IP_PRIVADA_SOBREMESA
+```
+
+Mantén el túnel abierto y visita **http://127.0.0.1:3000** en el portátil. No necesitas Node, Python
+ni modelos en el portátil si solo usas el navegador. Si el puerto local está ocupado, usa
+`-L 3001:127.0.0.1:3000` y visita `http://127.0.0.1:3001`.
+
+Alternativa para desarrollar la UI en el portátil: ejecuta Next.js allí y crea un túnel
+`ssh -N -L 8000:127.0.0.1:8000 USUARIO@IP_PRIVADA_SOBREMESA`. Su `TAXGUIDE_API_URL` seguirá siendo
+`http://127.0.0.1:8000`. Oracle continúa solo con tareas offline; no es necesario desplegar allí
+la UI ni abrir los puertos 3000/8000/6333/8080/11434 a Internet. No se crean túneles automáticamente.
+
+## Descargas desde el navegador (también con API en el portátil)
+
+Abre `/crawler` y habilita `TAXGUIDE_ADMIN_TOKEN` en la terminal de la API siguiendo
+[crawler web](crawler-ui.md). Permite seleccionar secciones, comprobar capturas y descargar sin
+arrancar ningún modelo. Si Python corre en el portátil y llama.cpp en el sobremesa, el crawler
+usa CPU/red/disco del **portátil**, sin ocupar la GPU del sobremesa. No hay control remoto de Oracle.
+Si Python está en el sobremesa y accedes mediante túnel, los archivos quedan en el sobremesa.
+
+Las capturas hechas por CLI en Oracle solo aparecen después de sincronizar HTML y manifiestos a
+los directorios `corpus.raw_directory` y `corpus.crawl_manifest_directory` de la API. Haz la
+sincronización sin un crawl web o build concurrente; después pulsa **Actualizar inventario**.
+La descarga no indexa: ejecuta `taxguide corpus build ... --index` en la máquina con acceso a
+embeddings/Qdrant y la misma configuración/directorios. Los cambios de `/settings` no modifican
+el YAML de ese comando. La [guía de la interfaz](frontend.md) contiene los comandos de arranque.
+
+## Etapa 1: validar todo en el sobremesa
+
+Esta es la primera configuración que debe funcionar de extremo a extremo. No distribuyas procesos
+hasta obtener respuestas correctas y repetibles de esta etapa.
+
+### 1. Preparar el repositorio
+
+En PowerShell, desde la raíz del repositorio:
+
+```powershell
+uv sync --locked
+uv run taxguide --help
+nvidia-smi
+ollama --version
+```
+
+TaxGuide requiere Python 3.12 o posterior. Los pesos de los modelos y los binarios de Ollama y
+llama.cpp se gestionan fuera del proyecto.
+
+### 2. Iniciar Qdrant
+
+```powershell
+docker compose up -d qdrant
+Invoke-RestMethod -Uri "http://127.0.0.1:6333/healthz"
+```
+
+El volumen persistente queda en `data/qdrant`. El `compose.yaml` del repositorio es únicamente para
+desarrollo local: publica Qdrant solo en loopback del host. No lo expongas a Internet; usa túneles
+privados para otros equipos. Los contenedores creados con el compose anterior conservan sus
+bindings hasta recrearlos; compruébalos antes de habilitar su gestión desde la app.
+
+### 3. Iniciar embeddings
+
+```powershell
+ollama pull qwen3-embedding:0.6b
+
+$embedBody = '{"model":"qwen3-embedding:0.6b","input":["dimension probe"]}'
+$embedResponse = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:11434/api/embed" `
+  -ContentType "application/json" `
+  -Body $embedBody
+$embedResponse.embeddings[0].Count
+```
+
+El primer `corpus build --index` crea la colección Qdrant con esa dimensión. Si cambias el modelo o
+su dimensión, utiliza un nombre de colección nuevo; TaxGuide rechazará una colección incompatible.
+
+### 4. Iniciar el generador en la GTX 1060
+
+Usa una conversión GGUF fijada de `Qwen/Qwen3-4B-Instruct-2507`, inicialmente en Q4_K_M y con
+contexto 4096:
+
+```powershell
+llama-server `
+  -m C:\models\qwen3-4b-instruct-2507-q4_k_m.gguf `
+  --alias Qwen/Qwen3-4B-Instruct-2507 `
+  --host 127.0.0.1 --port 8080 `
+  -c 4096 -ngl 99 --jinja
+```
+
+No aumentes el contexto ni atiendas varias generaciones simultáneas al principio. La GTX 1060 de
+6 GB debe compartir memoria con el modelo de embeddings y el contexto del generador. Si aparece un
+error de memoria:
+
+1. mantén el generador Q4_K_M y contexto 4096;
+2. ejecuta el reranker exclusivamente en el portátil;
+3. reduce `corpus.embedding_batch_size` de 32 a 8 durante la indexación;
+4. si aún hay contención, mueve los embeddings a CPU o evita indexar mientras generas respuestas.
+
+No cambies a un modelo generativo mayor hasta medir latencia, RAM y VRAM con el corpus real.
+
+### 5. Construir el corpus y responder
+
+Los cambios del clasificador determinista sólo requieren reiniciar la API, no reindexar ni
+reiniciar el LLM del sobremesa. `uncertain` solicita aclarar el ámbito fiscal incluso con año
+seleccionado. Las variantes de deducibilidad EN/NO/ES ya reconocidas siguen exigiendo año y
+evidencia cuando corresponde; consulta [routing](routing.md). Los tests del clasificador/UI son
+deterministas y no sustituyen la evaluación con modelos y fuentes reales.
+
+Para preguntas de importes por año, añade fuentes anuales con la
+[guía de corpus 2025/2026](annual-corpus.md): el crawl general siguiente no garantiza años.
+En el portátil, `configs/base.yaml` usa `127.0.0.1` para Qdrant/Ollama locales; evita la espera
+de conexión observada con `localhost`. El LLM del sobremesa conserva su dirección remota.
+
+```powershell
+uv run taxguide crawl `
+  "https://www.skatteetaten.no/en/person/taxes/tax-return/" `
+  --max-pages 25 --max-depth 2
+
+uv run taxguide corpus build `
+  --url-prefix "/en/person/taxes/" `
+  --language en --dry-run
+
+uv run taxguide corpus build `
+  --url-prefix "/en/person/taxes/" `
+  --language en --index
+
+uv run taxguide retrieve `
+  "What is the minimum standard deduction for 2025?" `
+  --mode hybrid --limit 5
+
+uv run taxguide answer `
+  "What is the minimum standard deduction for 2025?" `
+  --mode hybrid --json
+```
+
+Empieza con `hybrid`: no requiere reranker. Una ejecución correcta de `answer` devuelve
+`answered`, `clarification_required` o `abstained`; `failed` indica un problema operativo. TaxGuide
+nunca publica directamente el texto sin validar del modelo.
+
+## Etapa 2: mover el reranker al portátil
+
+El reranker es el proceso más razonable para separar. El modelo de 0.6B cabe en la RAM del portátil,
+el i7-13700H puede ejecutarlo en CPU y la GTX del sobremesa queda reservada para generación.
+
+### Opción recomendada: llama.cpp y túnel SSH
+
+En el portátil, inicia el servicio ligado únicamente a loopback:
+
+```powershell
+llama-server `
+  -hf ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF:Q8_0 `
+  --alias Qwen/Qwen3-Reranker-0.6B --reranking `
+  --host 127.0.0.1 --port 8001 -ngl 0 -c 4096 --parallel 1 `
+  -b 2048 -ub 2048
+```
+
+Con un servidor SSH habilitado en el portátil, crea el túnel desde el sobremesa:
+
+```powershell
+ssh -N -L 8001:127.0.0.1:8001 usuario@IP_PRIVADA_PORTATIL
+```
+
+Mientras el túnel esté abierto, el sobremesa puede conservar `http://localhost:8001`. Crea, por
+ejemplo, `configs/three-machines.yaml` como overlay local no secreto:
+
+```yaml
+project:
+  environment: three-machines
+corpus:
+  embedding_batch_size: 8
+retrieval:
+  default_mode: reranked
+  reranker_provider: llamacpp
+  reranker_base_url: http://127.0.0.1:8001
+  reranker_timeout: 120.0
+  candidate_limit: 10
+generation:
+  base_url: http://127.0.0.1:8080
+  evidence_max_tokens: 2400
+  max_tokens: 1000
+```
+
+Pruébalo desde el sobremesa:
+
+```powershell
+uv run taxguide retrieve `
+  "What is the minimum standard deduction for 2025?" `
+  --mode reranked --candidate-limit 10 --limit 5 `
+  --overlay configs/three-machines.yaml
+
+uv run taxguide answer `
+  "What is the minimum standard deduction for 2025?" `
+  --mode reranked --candidate-limit 10 --limit 5 `
+  --overlay configs/three-machines.yaml --json
+```
+
+El túnel evita abrir el puerto 8001 a toda la red. Si prefieres conexión LAN directa, enlaza el
+reranker a la IP privada del portátil, permite el puerto solo desde la IP del sobremesa en el
+firewall y cambia `reranker_base_url` a esa IP. No lo publiques mediante port forwarding del router.
+
+### Alternativa Python
+
+El repositorio también incluye un servicio FastAPI basado en `sentence-transformers`:
+
+```powershell
+uv sync --locked --extra local-models
+uv run --extra local-models uvicorn taxguide.reranking.service:app --host 127.0.0.1 --port 8001
+```
+
+En ese caso configura `reranker_provider: http`. Esta opción es cómoda para desarrollo, pero
+normalmente consume más RAM que el GGUF con llama.cpp. No ejecutes ambos rerankers a la vez.
+
+## Etapa 3: usar Oracle para crawling programado
+
+La VM debe contener únicamente documentación pública y artefactos operativos. No subas consultas
+de usuarios, respuestas ni datos fiscales personales.
+
+### Preparación en la VM
+
+Ejemplo para una VM Linux con el repositorio en `/opt/taxguide`:
+
+```bash
+cd /opt/taxguide
+uv sync --locked
+uv run taxguide crawl --help
+mkdir -p logs
+```
+
+El proyecto instala actualmente las dependencias en un único entorno, incluidas algunas de ML. En
+una VM ARM puede ser necesario comprobar que existen wheels compatibles. Si la instalación completa
+no cabe o no está soportada, mantén el crawling en el sobremesa hasta separar dependencias por rol;
+no sustituyas paquetes fijados de forma silenciosa.
+
+Una entrada de `crontab -e` para un crawl semanal limitado podría ser:
+
+```cron
+15 3 * * 1 cd /opt/taxguide && /usr/local/bin/uv run taxguide crawl "https://www.skatteetaten.no/en/person/taxes/tax-return/" --max-pages 50 --max-depth 2 >> /opt/taxguide/logs/crawl.log 2>&1
+```
+
+Antes de automatizar, ejecuta exactamente el mismo comando manualmente y revisa el manifiesto, los
+códigos HTTP y el límite de páginas. No incrementes la frecuencia ni elimines el retardo configurado
+sin revisar la política del sitio.
+
+### Sincronizar el crawl con el sobremesa
+
+Detén cualquier construcción de corpus concurrente y copia los artefactos producidos por el crawl:
+
+```powershell
+scp -r ubuntu@IP_ORACLE:/opt/taxguide/data/raw/skatteetaten data/raw/
+scp -r ubuntu@IP_ORACLE:/opt/taxguide/data/manifests/crawl data/manifests/
+```
+
+Después, en el sobremesa, ejecuta primero `--dry-run`, revisa el informe y solo entonces indexa:
+
+```powershell
+uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --dry-run
+uv run taxguide corpus build --url-prefix "/en/person/taxes/" --language en --index
+```
+
+Qdrant permanece como fuente de verdad en el sobremesa. Los ficheros de Qdrant no deben copiarse
+mientras la base de datos está escribiendo; para copias, detén Qdrant o usa un mecanismo de snapshot
+compatible con la versión instalada.
+
+## Uso opcional de Qdrant en Oracle
+
+No es la configuración inicial recomendada. Solo tiene sentido si necesitas que varios clientes
+accedan a un índice siempre encendido y ya has medido almacenamiento, memoria, latencia y copias.
+
+La configuración actual de TaxGuide no contiene un campo para la API key de Qdrant. Hasta añadir
+configuración autenticada, liga Qdrant a loopback en Oracle y accede mediante túnel SSH:
+
+```powershell
+ssh -N -L 6333:127.0.0.1:6333 ubuntu@IP_ORACLE
+```
+
+El cliente puede seguir usando `corpus.qdrant_url: http://127.0.0.1:6333`. No expongas los puertos
+6333 o 6334 mediante las reglas públicas de Oracle Cloud.
+
+## Orden de arranque diario
+
+1. En el sobremesa, inicia Qdrant y comprueba `/healthz`.
+2. Comprueba Ollama con la petición de embedding.
+3. Inicia el generador y comprueba que escucha en el puerto 8080.
+4. Solo para `reranked`, inicia el reranker en el portátil y abre el túnel.
+5. Ejecuta una recuperación conocida antes de probar generación.
+6. Ejecuta `taxguide answer` y conserva el JSON si estás midiendo resultados.
+
+Para aislar fallos, comprueba en este orden:
+
+```text
+Qdrant → embedding de consulta → dense/hybrid retrieval → reranker → generator → answer
+```
+
+Si `hybrid` funciona y `reranked` no, el problema está en el portátil, el túnel o el adaptador del
+reranker. Si `retrieve` funciona y `answer` no, revisa el generador, su nombre de modelo, el contexto
+y la validez del JSON devuelto.
+
+## Perfil inicial de operación
+
+Mantén estos límites hasta tener benchmarks propios:
+
+| Parámetro | Valor inicial |
+| --- | --- |
+| Generador | Qwen3-4B-Instruct-2507 GGUF Q4_K_M |
+| Contexto de llama.cpp | 4096 tokens |
+| Concurrencia generativa | 1 |
+| Evidencia | 2400 tokens |
+| Salida máxima | 1000 tokens |
+| Candidatos para reranking | 10 |
+| Resultado final | 5 chunks |
+| Batch de embeddings en GTX 1060 | 8 inicialmente; aumentar después de medir |
+
+Registra para cada prueba el commit Git, overlay, hash del GGUF, versión de llama.cpp/Ollama,
+driver NVIDIA, colección Qdrant, corpus, latencia fría/caliente y picos de RAM/VRAM. Sin esos datos
+no es posible comparar de forma fiable un cambio de modelo o de máquina.
+
+## Qué no está automatizado todavía
+
+- El panel `/settings` puede iniciar/parar Qdrant, Ollama y llama.cpp preconfigurados solo en
+  la máquina de la API. No controla procesos remotos ni túneles SSH. Consulta
+  [conexiones y servicios](runtime-management.md) para habilitarlo.
+- No existe failover automático entre sobremesa, portátil y Oracle.
+- Existen API HTTP e interfaz Next.js; solo la administración tiene clave, no las consultas.
+  Úsala en local o mediante un túnel privado. La interfaz no descarga modelos ni los inicia
+  en otra máquina: si Python corre en el sobremesa y navegas desde el portátil, «local» es el
+  sobremesa. Qdrant en Oracle se configura mediante el endpoint/túnel autorizado y se arranca allí.
+- El cache de embeddings separa consultas y documentos, pero es local al proceso, no persistente
+  y no está compuesto por la factory.
+- No hay un benchmark real de corpus/generación con umbrales de release comprometido al repositorio.
+- El servicio remoto de reranking no tiene autenticación propia.
+- El despliegue distribuido depende de direcciones estáticas o túneles administrados por el operador.
+
+Por estas limitaciones, la arquitectura de tres máquinas debe tratarse como entorno de desarrollo y
+evaluación. El siguiente paso operativo razonable es estabilizar la etapa 1, medirla y mover solo el
+reranker al portátil; Oracle se incorpora después para crawling y copias, no para inferencia.
+El [Compose privado de un solo host](production-readiness.md) es una opción alternativa para API,
+frontend y Qdrant, no una orquestación automática entre estas tres máquinas. Sus URLs de
+`host.docker.internal` requieren adaptación y pruebas antes de mover servicios entre equipos.
+La prueba de despliegue Docker en CI usa una aclaración sin modelos; no verifica la conectividad
+entre el sobremesa, el portátil y Oracle ni sustituye el benchmark live.
+La [medición exploratoria de retrieval](evaluation/v1-retrieval-2026-09-28.md) usa servicios reales
+en CPU; no incluye generación con el LLM en GPU ni aprobación de release. El
+[audit del repositorio](repository-audit.md) registra las pruebas deterministas y el issue #86 pendiente.

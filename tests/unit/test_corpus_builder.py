@@ -1,0 +1,311 @@
+from datetime import UTC, datetime
+from hashlib import sha256
+from pathlib import Path
+
+from taxguide.chunking.structural import StructuralChunker
+from taxguide.corpus.builder import CorpusBuilder
+from taxguide.corpus.models import CorpusFilters, CorpusSelection, CrawlManifest
+from taxguide.corpus.selector import ManifestCorpusSelector
+from taxguide.corpus.storage import FileCorpusReportRepository
+from taxguide.domain.enums import PageType
+from taxguide.domain.models import Chunk
+from taxguide.embeddings.mock import MockEmbedder
+from taxguide.ingestion.hashing import document_id_from_url
+from taxguide.ingestion.normalizer import Normalizer
+from taxguide.ingestion.pipeline import IngestionPipeline
+from taxguide.ingestion.skatteetaten_parser import SkatteetatenHtmlParser
+from taxguide.retrieval.filters import RetrievalFilter
+from taxguide.retrieval.sparse import SparseRetriever
+from taxguide.sources.local import LocalHtmlSource
+from taxguide.vectorstores.qdrant import qdrant_point_id
+
+
+def make_manifest(name: str) -> CrawlManifest:
+    return CrawlManifest(
+        document_id=sha256(name.encode()).hexdigest(),
+        original_url="https://www.skatteetaten.no/en/person/taxes/example/",
+        final_url="https://www.skatteetaten.no/en/person/taxes/example/",
+        retrieved_at=datetime(2026, 9, 10, tzinfo=UTC),
+        http_status=200,
+        content_type="text/html",
+        content_sha256=sha256(b"fixture").hexdigest(),
+        language="en",
+        page_type=PageType.STATIC_ARTICLE,
+    )
+
+
+def pipeline(manifest: CrawlManifest) -> IngestionPipeline:
+    return IngestionPipeline(
+        LocalHtmlSource(clock=lambda: manifest.retrieved_at),
+        SkatteetatenHtmlParser(),
+        Normalizer(),
+    )
+
+
+def test_build_reuses_ingestion_and_chunking_one_document_at_a_time(tmp_path: Path) -> None:
+    item = make_manifest("document")
+    raw = tmp_path / f"{item.document_id}.html"
+    raw.write_text(
+        '<html lang="en"><main><h1>Tax</h1><p>Useful content.</p></main></html>', encoding="utf-8"
+    )
+    selection = CorpusSelection(manifests=[item], scanned=1)
+    report = CorpusBuilder(pipeline, StructuralChunker(max_tokens=10)).build(
+        selection,
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    assert report.processed == 1
+    assert report.chunks_generated == 1
+    assert report.document_ids == [item.document_id]
+
+
+def test_missing_raw_artifact_is_reported_without_aborting(tmp_path: Path) -> None:
+    item = make_manifest("missing")
+    report = CorpusBuilder(pipeline, StructuralChunker()).build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    assert report.failed == 1
+    assert report.failures[0].stage == "raw_artifact"
+
+
+class RecordingStore:
+    def __init__(self) -> None:
+        self.batches: list[list[Chunk]] = []
+        self.versions: dict[tuple[str, str | None], dict[str, str]] = {}
+
+    def has_document_version(
+        self, *, document_id: str, version_id: str, expected_chunks: list[Chunk]
+    ) -> bool:
+        expected = {chunk.id: chunk.content_hash for chunk in expected_chunks}
+        return self.versions.get((document_id, version_id), {}) == expected
+
+    def upsert(self, chunks: list[Chunk], embeddings: list[tuple[float, ...]]) -> None:
+        assert len(chunks) == len(embeddings)
+        self.batches.append(chunks)
+        for chunk in chunks:
+            key = (chunk.document_id, chunk.metadata.version_id)
+            self.versions.setdefault(key, {})[chunk.id] = chunk.content_hash
+
+    def prune_document_points(self, *, document_id: str, keep_chunk_ids: list[str]) -> None:
+        keep = set(keep_chunk_ids)
+        for key in list(self.versions):
+            if key[0] == document_id:
+                self.versions[key] = {
+                    chunk_id: content_hash
+                    for chunk_id, content_hash in self.versions[key].items()
+                    if chunk_id in keep
+                }
+                if not self.versions[key]:
+                    del self.versions[key]
+
+    def search(self, query: tuple[float, ...], *, limit: int) -> list[object]:
+        return []
+
+
+def test_indexing_uses_existing_embedder_and_vector_store(tmp_path: Path) -> None:
+    item = make_manifest("indexed")
+    (tmp_path / f"{item.document_id}.html").write_text(
+        "<html><main><h1>Tax</h1><p>Indexed content.</p></main></html>", encoding="utf-8"
+    )
+    store = RecordingStore()
+    report = CorpusBuilder(
+        pipeline,
+        StructuralChunker(),
+        embedder=MockEmbedder(),
+        vector_store=store,
+        embedding_provider="ollama",
+    ).build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+        vector_collection="test",
+    )
+    assert report.indexing_enabled
+    assert report.embedding_provider == "ollama"
+    assert report.embedding_model == "mock-deterministic-v1"
+    assert sum(len(batch) for batch in store.batches) == report.chunks_generated
+
+
+def test_repeated_index_build_skips_an_already_indexed_source_version(tmp_path: Path) -> None:
+    html = "<html><main><h1>Tax</h1><p>Stable source content.</p></main></html>"
+    item = make_manifest("incremental").model_copy(
+        update={"content_sha256": sha256(html.encode()).hexdigest()}
+    )
+    (tmp_path / f"{item.document_id}.html").write_text(html, encoding="utf-8")
+    store = RecordingStore()
+    builder = CorpusBuilder(
+        pipeline,
+        StructuralChunker(),
+        embedder=MockEmbedder(),
+        vector_store=store,
+    )
+    selection = CorpusSelection(manifests=[item], scanned=1)
+
+    first = builder.build(
+        selection,
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    batches_after_first = len(store.batches)
+    second = builder.build(
+        selection,
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+
+    assert first.processed == 1 and first.unchanged == 0
+    assert second.processed == 0 and second.unchanged == 1
+    assert len(store.batches) == batches_after_first
+
+
+def test_changed_source_replaces_old_version_without_stale_points(tmp_path: Path) -> None:
+    first_html = "<html><main><h1>Tax</h1><p>Old guidance.</p></main></html>"
+    second_html = "<html><main><h1>Tax</h1><p>New guidance.</p></main></html>"
+    item = make_manifest("replacement")
+    raw = tmp_path / f"{item.document_id}.html"
+    store = RecordingStore()
+    builder = CorpusBuilder(
+        pipeline, StructuralChunker(), embedder=MockEmbedder(), vector_store=store
+    )
+
+    raw.write_text(first_html, encoding="utf-8")
+    first = builder.build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    old_ids = {chunk.id for batch in store.batches for chunk in batch}
+    raw.write_text(second_html, encoding="utf-8")
+    second = builder.build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    current_ids = {chunk.id for batch in store.batches[1:] for chunk in batch}
+
+    assert first.processed == second.processed == 1
+    assert old_ids.isdisjoint(current_ids)
+    assert {chunk_id for points in store.versions.values() for chunk_id in points} == current_ids
+
+
+def test_annual_versions_keep_distinct_identity_through_vector_indexing(tmp_path: Path) -> None:
+    canonical = "https://www.skatteetaten.no/en/rates/minimum-standard-deduction/"
+    urls = [f"{canonical}?year=2025", f"{canonical}?year=2026", canonical]
+    manifests = [
+        CrawlManifest(
+            document_id=document_id_from_url(url),
+            original_url=url,
+            final_url=url,
+            canonical_url=canonical,
+            retrieved_at=datetime(2026, 9, 10, tzinfo=UTC),
+            http_status=200,
+            content_type="text/html",
+            content_sha256=sha256(b"same fixture").hexdigest(),
+            language="en",
+            page_type=PageType.STATIC_ARTICLE,
+            duplicate_of=document_id_from_url(urls[0]) if url == urls[1] else None,
+        )
+        for url in urls
+    ]
+    assert [item.document_id for item in manifests] == [
+        "0066a5f6f09b590b9616aef42247cde574721de3a15afa7bedcab7e017ecc987",
+        "902b92d03bc1e0d52371a745b5362f3e9a250efd8b73e462fd856e6ed2f58e41",
+        "d52d4518a194e0047294bbe0db60e9a14240c64ae9b639bbf95e79a70e5301be",
+    ]
+    html = "<html><main><h1>Deduction</h1><p>Annual tax content.</p></main></html>"
+    for item, year in zip(manifests, [2025, 2026, None], strict=True):
+        selector = (
+            '<select id="js-rateSelectedYear">'
+            f'<option selected value="{year}">{year}</option></select>'
+            if year
+            else ""
+        )
+        (tmp_path / f"{item.document_id}.html").write_text(
+            html.replace("<main>", f"<main>{selector}"), encoding="utf-8"
+        )
+
+    filters = CorpusFilters()
+    selection = ManifestCorpusSelector().select(manifests, filters)
+    store = RecordingStore()
+    report = CorpusBuilder(
+        pipeline,
+        StructuralChunker(),
+        embedder=MockEmbedder(),
+        vector_store=store,
+    ).build(
+        selection,
+        filters,
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+
+    chunks = [chunk for batch in store.batches for chunk in batch]
+    assert report.processed == 3
+    assert report.documents_by_tax_year == {"2025": 1, "2026": 1, "unknown": 1}
+    assert set(report.stage_seconds) == {
+        "ingestion",
+        "chunking",
+        "index_lookup",
+        "embedding",
+        "index_upsert",
+        "index_prune",
+    }
+    assert all(value >= 0 for value in report.stage_seconds.values())
+    assert {chunk.document_id for chunk in chunks} == {item.document_id for item in manifests}
+    assert {chunk.metadata.source_url for chunk in chunks} == set(urls)
+    assert {chunk.metadata.tax_year for chunk in chunks} == {2025, 2026, None}
+    assert len({chunk.id for chunk in chunks}) == 3
+    assert len({qdrant_point_id(chunk.id) for chunk in chunks}) == 3
+    for year in (2025, 2026):
+        results = SparseRetriever(chunks).retrieve(
+            "Annual tax content", filters=RetrievalFilter(tax_year=year)
+        )
+        assert len(results) == 1
+        assert results[0].chunk.metadata.source_url == f"{canonical}?year={year}"
+
+
+def test_legacy_url_year_without_evidence_is_not_indexed(tmp_path: Path) -> None:
+    item = make_manifest("unverified").model_copy(
+        update={
+            "final_url": "https://www.skatteetaten.no/en/rates/test/?year=2026",
+            "tax_year": 2026,
+        }
+    )
+    (tmp_path / f"{item.document_id}.html").write_text(
+        "<main><h1>Rate</h1><p>Mentions 2025 and 2026 but confirms neither.</p></main>",
+        encoding="utf-8",
+    )
+    store = RecordingStore()
+    report = CorpusBuilder(
+        pipeline, StructuralChunker(), embedder=MockEmbedder(), vector_store=store
+    ).build(
+        CorpusSelection(manifests=[item], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path,
+        source_manifest_directory=tmp_path,
+    )
+    assert report.failed == 1 and report.processed == 0
+    assert report.documents_by_tax_year == {}
+    assert not store.batches
+    assert "not confirmed" in report.failures[0].message
+
+
+def test_run_report_is_persisted_separately_from_crawl_manifests(tmp_path: Path) -> None:
+    report = CorpusBuilder(pipeline, StructuralChunker()).build(
+        CorpusSelection(manifests=[], scanned=1),
+        CorpusFilters(),
+        raw_directory=tmp_path / "raw",
+        source_manifest_directory=tmp_path / "crawl",
+    )
+    path = FileCorpusReportRepository(tmp_path / "corpus").save(report)
+    assert path.name == f"{report.run_id}.json"
+    assert '"source_manifest_directory"' in path.read_text(encoding="utf-8")

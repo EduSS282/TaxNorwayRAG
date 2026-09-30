@@ -7,16 +7,60 @@ class DocumentLoadError(TaxguideError):
 
 
 class UnsupportedDocumentError(TaxguideError):
-    pass
+    """No parser supports the document's source or format."""
 
 
 class ParseError(TaxguideError):
-    pass
+    """A supported document could not be parsed into usable content."""
 
 
 class EmptyDocumentError(ParseError):
-    pass
+    """Parsing a supported document produced no substantive content."""
 
 
 class InvalidConfigurationError(TaxguideError):
     pass
+
+
+class CrawlerError(TaxguideError):
+    """Base error for safe remote document acquisition."""
+
+
+class DisallowedDomainError(CrawlerError):
+    pass
+
+
+class RobotsDisallowedError(CrawlerError):
+    pass
+
+
+class UnsupportedContentTypeError(CrawlerError):
+    pass
+
+
+class FetchError(CrawlerError):
+    pass
+
+
+class ResponseTooLargeError(FetchError):
+    pass
+
+
+class CorpusError(TaxguideError):
+    """A manifest-driven corpus build could not complete safely."""
+
+
+class EmbeddingError(TaxguideError):
+    """An embedding provider returned an unusable result or could not be reached."""
+
+
+class VectorStoreError(TaxguideError):
+    """A vector-store request was rejected or could not be completed."""
+
+
+class TemporalResolutionError(TaxguideError):
+    """A query's applicable tax year is absent, ambiguous, or contradictory."""
+
+
+class CrossYearRetrievalError(TaxguideError):
+    """A retriever returned evidence outside the requested temporal scope."""

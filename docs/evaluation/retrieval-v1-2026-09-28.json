@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "collection": "taxguide_chunks_temporal_v1",
+  "dataset_version": "v1",
+  "evaluated_at": "2026-09-28T07:35:12.898545Z",
+  "rows": [
+    {
+      "pipeline": "Dense",
+      "recall_at_1": 0.13333333333333333,
+      "recall_at_5": 0.7333333333333333,
+      "recall_at_10": 0.8,
+      "success_at_1": 0.13333333333333333,
+      "success_at_5": 0.7333333333333333,
+      "mrr": 0.38087301587301586,
+      "ndcg_at_5": 0.46190834211992793,
+      "ndcg_at_10": 0.4848930261346398,
+      "total_latency_seconds": 7.4356644999998025,
+      "mean_latency_seconds": 0.24785548333332674,
+      "median_latency_seconds": 0.1586019999999735,
+      "p95_latency_seconds": 0.620882800000345
+    },
+    {
+      "pipeline": "Sparse",
+      "recall_at_1": 0.16666666666666666,
+      "recall_at_5": 0.36666666666666664,
+      "recall_at_10": 0.43333333333333335,
+      "success_at_1": 0.16666666666666666,
+      "success_at_5": 0.36666666666666664,
+      "mrr": 0.24563492063492062,
+      "ndcg_at_5": 0.2684629727121031,
+      "ndcg_at_10": 0.2906851949343254,
+      "total_latency_seconds": 0.5955294999998841,
+      "mean_latency_seconds": 0.01985098333332947,
+      "median_latency_seconds": 0.017128599999978178,
+      "p95_latency_seconds": 0.024744100000134495
+    },
+    {
+      "pipeline": "Hybrid",
+      "recall_at_1": 0.3,
+      "recall_at_5": 0.6,
+      "recall_at_10": 0.7,
+      "success_at_1": 0.3,
+      "success_at_5": 0.6,
+      "mrr": 0.4381481481481481,
+      "ndcg_at_5": 0.470103596224556,
+      "ndcg_at_10": 0.5011689211990706,
+      "total_latency_seconds": 8.34862510000039,
+      "mean_latency_seconds": 0.27828750333334634,
+      "median_latency_seconds": 0.17851440000004004,
+      "p95_latency_seconds": 0.609242600000016
+    },
+    {
+      "pipeline": "Hybrid+Reranker",
+      "recall_at_1": 0.3,
+      "recall_at_5": 0.6,
+      "recall_at_10": null,
+      "success_at_1": 0.3,
+      "success_at_5": 0.6,
+      "mrr": 0.40944444444444444,
+      "ndcg_at_5": 0.4567533831913517,
+      "ndcg_at_10": null,
+      "total_latency_seconds": 1043.6555530000028,
+      "mean_latency_seconds": 34.78851843333343,
+      "median_latency_seconds": 32.536366550000366,
+      "p95_latency_seconds": 52.486333399999694
+    }
+  ]
+}

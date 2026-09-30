@@ -9,5 +9,51 @@ ingestion:
   parser: skatteetaten
   preserve_links: true
   preserve_headings: true
+crawler:
+  user_agent: TaxGuideNorwayCrawler/0.1
+  connect_timeout: 10.0
+  read_timeout: 20.0
+  max_retries: 2
+  request_delay: 0.75
+  max_retry_after_seconds: 60.0
+  max_response_bytes: 5000000
+  max_pages: 50
+  max_depth: 2
+  allowed_hosts:
+    - www.skatteetaten.no
+    - skatteetaten.no
+  allowed_path_prefixes: []
+corpus:
+  crawl_manifest_directory: data/manifests/crawl
+  raw_directory: data/raw/skatteetaten
+  report_directory: data/manifests/corpus
+  chunk_strategy: structural
+  max_tokens: 512
+  overlap_tokens: 0
+  embedding_provider: ollama
+  embedding_model: qwen3-embedding:0.6b
+  embedding_base_url: http://127.0.0.1:11434
+  embedding_timeout: 120.0
+  embedding_batch_size: 32
+  qdrant_url: http://127.0.0.1:6333
+  qdrant_collection: taxguide_chunks_temporal_v1
+retrieval:
+  default_mode: dense
+  candidate_limit: 10
+  reranker_provider: llamacpp
+  reranker_model: Qwen/Qwen3-Reranker-0.6B
+  reranker_base_url: http://localhost:8001
+  reranker_timeout: 30.0
+generation:
+  model_profile: portable
+  provider: openai_compatible
+  base_url: http://100.112.6.87:8080
+  model: Qwen/Qwen3-4B-Instruct-2507
+  timeout: 180.0
+  evidence_max_tokens: 2400
+  max_chunks_per_document: 2
+  temperature: 0.1
+  max_tokens: 1000
+  structured_output: true
 logging:
   level: INFO

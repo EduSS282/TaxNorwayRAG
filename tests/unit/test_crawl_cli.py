@@ -1,0 +1,143 @@
+import importlib
+import json
+from collections.abc import Callable
+from pathlib import Path
+
+from typer.testing import CliRunner
+
+from taxguide.cli.main import app
+from taxguide.crawling.http import HttpResponse
+
+BASE = "https://www.skatteetaten.no"
+
+
+class CliHttpClient:
+    def __init__(self, **_: object) -> None:
+        pass
+
+    def fetch(
+        self, url: str, *, before_request: Callable[[str], None] | None = None
+    ) -> HttpResponse:
+        if before_request is not None:
+            before_request(url)
+        if url.endswith("/robots.txt"):
+            return HttpResponse(url, 200, {"content-type": "text/plain"}, b"User-agent: *\n")
+        return HttpResponse(
+            url,
+            200,
+            {"content-type": "text/html"},
+            b'<html lang="en"><main><p>Tax page</p></main></html>',
+        )
+
+    def close(self) -> None:
+        pass
+
+
+def test_crawl_cli_human_and_json_output(monkeypatch, tmp_path: Path) -> None:
+    crawl_module = importlib.import_module("taxguide.cli.crawl")
+    monkeypatch.setattr(crawl_module, "SafeHttpClient", CliHttpClient)
+    runner = CliRunner()
+    common = [f"{BASE}/page", "--max-pages", "1", "--output-dir", str(tmp_path)]
+
+    human = runner.invoke(app, ["crawl", *common])
+    assert human.exit_code == 0, human.output
+    assert "Crawl complete" in human.stdout
+    assert "Fetched:             1" in human.stdout
+
+    machine = runner.invoke(app, ["crawl", *common, "--json"])
+    assert machine.exit_code == 0, machine.output
+    payload = json.loads(machine.stdout)
+    assert payload["fetched"] == 1
+    assert "raw_html" not in payload["pages"][0]
+
+
+def test_crawl_cli_reports_disallowed_seed_without_traceback(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        app, ["crawl", "https://example.com", "--output-dir", str(tmp_path)]
+    )
+    assert result.exit_code == 1
+    assert "Error:" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_crawl_cli_selects_named_source_and_persists_source_id(monkeypatch, tmp_path: Path) -> None:
+    crawl_module = importlib.import_module("taxguide.cli.crawl")
+    monkeypatch.setattr(crawl_module, "SafeHttpClient", CliHttpClient)
+    result = CliRunner().invoke(
+        app,
+        [
+            "crawl",
+            "--source",
+            "skatteetaten-tax-return-en",
+            "--max-pages",
+            "1",
+            "--json",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["pages"][0]["source_id"] == "skatteetaten-tax-return-en"
+    manifests = list((tmp_path / "manifests" / "crawl").glob("*.json"))
+    assert (
+        json.loads(manifests[0].read_text(encoding="utf-8"))["source_id"]
+        == "skatteetaten-tax-return-en"
+    )
+
+
+def test_crawl_cli_named_source_rejects_out_of_scope_url(monkeypatch, tmp_path: Path) -> None:
+    crawl_module = importlib.import_module("taxguide.cli.crawl")
+    monkeypatch.setattr(crawl_module, "SafeHttpClient", CliHttpClient)
+    result = CliRunner().invoke(
+        app,
+        [
+            "crawl",
+            f"{BASE}/en/person/taxes/other/",
+            "--source",
+            "skatteetaten-tax-return-en",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "outside allowed prefixes" in result.output
+
+
+def test_crawl_cli_accepts_repeatable_years(monkeypatch, tmp_path: Path) -> None:
+    crawl_module = importlib.import_module("taxguide.cli.crawl")
+
+    class AnnualHttp(CliHttpClient):
+        def fetch(self, url, *, before_request=None):
+            result = super().fetch(url, before_request=before_request)
+            if url.endswith("/robots.txt"):
+                return result
+            year = 2025 if "year=2025" in url else 2026
+            html = '<html lang="en"><main><p>Rate</p></main><select id="js-rateSelectedYear">'
+            for value in (2025, 2026):
+                selected = "selected" if value == year else ""
+                html += f'<option {selected} value="{value}">{value}</option>'
+            return HttpResponse(
+                url, 200, {"content-type": "text/html"}, (html + "</select></html>").encode()
+            )
+
+    monkeypatch.setattr(crawl_module, "SafeHttpClient", AnnualHttp)
+    result = CliRunner().invoke(
+        app,
+        [
+            "crawl",
+            f"{BASE}/en/rates/test/",
+            "--year",
+            "2025",
+            "--year",
+            "2026",
+            "--max-pages",
+            "3",
+            "--no-follow",
+            "--json",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert [page["tax_year"] for page in json.loads(result.stdout)["pages"]] == [None, 2025, 2026]
