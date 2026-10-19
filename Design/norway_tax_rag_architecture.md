@@ -4603,9 +4603,9 @@ TaxGuide Norway se considerará técnicamente exitoso si puede demostrar:
 
 ---
 
-# 170. Orden exacto recomendado para desarrollar con Codex
+# 170. Orden recomendado de desarrollo
 
-No pedir a Codex:
+Evitar una petición que abarque todo el proyecto:
 
 ```text
 "Build the whole RAG."
