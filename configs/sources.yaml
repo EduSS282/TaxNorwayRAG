@@ -46,9 +46,11 @@ sources:
   - id: skatteetaten-abroad-en
     title: Ingresos, patrimonio y residencia en el extranjero
     domain: skatteetaten.no
-    seed_url: https://www.skatteetaten.no/en/person/taxes/get-the-taxes-right/abroad/
+    seed_url: https://www.skatteetaten.no/en/person/to-from-norway/
     language: [en]
     allowed_paths:
+      - /en/person/to-from-norway/
+      # Preserve previously supported URLs while permitting their verified migration.
       - /en/person/taxes/get-the-taxes-right/abroad/
   - id: skatteetaten-employment-en
     title: Empleo, prestaciones y pensiones
@@ -60,11 +62,12 @@ sources:
   - id: skatteetaten-foreign-workers-en
     title: Trabajadores extranjeros y PAYE
     domain: skatteetaten.no
-    seed_url: https://www.skatteetaten.no/en/person/foreign/are-you-intending-to-work-in-norway/
+    seed_url: https://www.skatteetaten.no/en/person/to-from-norway/to/
     language: [en]
     allowed_paths:
+      - /en/person/to-from-norway/to/
       - /en/person/foreign/are-you-intending-to-work-in-norway/
-      # The worker guide links to PAYE outside its own URL subtree.
+      # Retain the old PAYE subtree; the current one is under /to/work/tax-deduction-card/.
       - /en/person/taxes/tax-deduction-card-and-advance-tax/i-am-a-foreign-employee/paye/
   - id: skatteetaten-shares-en
     title: Acciones y valores

@@ -17,6 +17,10 @@ services are separate processes. TaxGuide does not install models or create tunn
 operator boundary can supervise preconfigured local services on the API host; remote services
 remain externally managed.
 
+Named source policies explicitly permit the reviewed Skatteetaten URL migrations for abroad and
+foreign-worker guidance. Redirects still pass host/path and robots checks before each request;
+source catalog corrections do not relax those checks. See [crawler policy](crawler.md).
+
 The standalone `compose.single-host.yaml` is an alternative deployment boundary on one Linux host.
 It starts the full set of containers and explicitly downloads model weights through an Ollama
 initializer and reranker startup. Model caches and application data persist in named volumes.

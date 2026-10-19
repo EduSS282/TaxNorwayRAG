@@ -36,6 +36,13 @@ capture manifest. `priority` is recorded policy metadata; crawl scheduling by pr
 implemented. URL-only crawls remain available and use the flat allowlists in `configs/base.yaml`.
 The source-policy YAML is distinct from the output JSON crawl manifests.
 
+The abroad and foreign-worker sections use Skatteetaten's current `/en/person/to-from-norway/`
+and `/en/person/to-from-norway/to/` entry points. Their previous paths remain explicitly allowed
+so redirects can reach the reviewed new scopes; other paths and external hosts remain blocked.
+The current PAYE page is under `/to/work/tax-deduction-card/paye/` relative to the abroad root.
+From the foreign-worker entry point, use depth 3 to reach PAYE through work and tax-card links.
+The sections overlap intentionally; content/document identity still governs duplicate handling.
+
 For annual rates, use the bounded `skatteetaten-rates-en` source and repeatable `--year`:
 
 ```console

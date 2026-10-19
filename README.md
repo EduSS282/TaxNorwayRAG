@@ -310,6 +310,8 @@ available under the host/path policy in `configs/base.yaml`. See [crawler](docs/
 The shared catalog has twelve English sections, including abroad/exit tax, employment/pensions,
 foreign workers/PAYE, shares, family and tax assessment. Refresh the crawler inventory to see
 catalog changes; downloads still require explicit selection, with at most eight sections per job.
+Abroad and foreign-worker entry points use the current `/en/person/to-from-norway/` tree;
+reviewed legacy redirects remain permitted within their explicit source scopes.
 
 ## Current limitations and deferred work
 

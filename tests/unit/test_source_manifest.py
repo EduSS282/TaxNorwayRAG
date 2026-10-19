@@ -1,8 +1,13 @@
 from pathlib import Path
 
+import httpx
 import pytest
 
+from taxguide.crawling.http import SafeHttpClient
+from taxguide.crawling.models import CrawlRequest
+from taxguide.crawling.skatteetaten import SkatteetatenCrawler
 from taxguide.crawling.sources import SourceManifest, load_source_manifest
+from taxguide.crawling.storage import FileCrawlArtifactRepository
 from taxguide.crawling.urls import validate_target
 from taxguide.domain.exceptions import DisallowedDomainError, InvalidConfigurationError
 
@@ -10,14 +15,14 @@ from taxguide.domain.exceptions import DisallowedDomainError, InvalidConfigurati
 @pytest.mark.parametrize(
     "source_id,path",
     [
-        ("skatteetaten-abroad-en", "/en/person/taxes/get-the-taxes-right/abroad/"),
+        ("skatteetaten-abroad-en", "/en/person/to-from-norway/"),
         (
             "skatteetaten-employment-en",
             "/en/person/taxes/get-the-taxes-right/employment-benefits-and-pensions/",
         ),
         (
             "skatteetaten-foreign-workers-en",
-            "/en/person/foreign/are-you-intending-to-work-in-norway/",
+            "/en/person/to-from-norway/to/",
         ),
         ("skatteetaten-shares-en", "/en/person/taxes/get-the-taxes-right/shares-and-securities/"),
         ("skatteetaten-family-en", "/en/person/taxes/get-the-taxes-right/family-and-health/"),
@@ -55,6 +60,76 @@ def test_exit_tax_and_paye_have_explicit_supported_scopes() -> None:
     )
     validate_target(paye, workers.allowed_hosts, workers.allowed_paths)
     validate_target(paye + "opting-out/", workers.allowed_hosts, workers.allowed_paths)
+    current_paye = (
+        "https://www.skatteetaten.no/en/person/to-from-norway/to/work/tax-deduction-card/paye/"
+    )
+    validate_target(current_paye, workers.allowed_hosts, workers.allowed_paths)
+    with pytest.raises(DisallowedDomainError):
+        validate_target(
+            "https://www.skatteetaten.no/en/person/to-from-norway/from/",
+            workers.allowed_hosts,
+            workers.allowed_paths,
+        )
+
+
+@pytest.mark.parametrize(
+    "source_id,legacy_path",
+    [
+        ("skatteetaten-abroad-en", "/en/person/taxes/get-the-taxes-right/abroad/"),
+        (
+            "skatteetaten-foreign-workers-en",
+            "/en/person/foreign/are-you-intending-to-work-in-norway/",
+        ),
+    ],
+)
+def test_verified_section_migrations_pass_scope_and_robots_checks(
+    tmp_path: Path, source_id: str, legacy_path: str
+) -> None:
+    source = load_source_manifest(Path("configs/sources.yaml")).get(source_id)
+    requested: list[str] = []
+    legacy_url = "https://www.skatteetaten.no" + legacy_path
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        requested.append(url)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /")
+        if url == legacy_url:
+            return httpx.Response(302, headers={"location": source.seed_url})
+        assert url == source.seed_url
+        return httpx.Response(
+            200,
+            text='<html lang="en"><main><h1>Tax</h1><p>Official guidance.</p></main></html>',
+            headers={"content-type": "text/html"},
+        )
+
+    client = SafeHttpClient(
+        user_agent="crawler-test",
+        connect_timeout=1,
+        read_timeout=1,
+        max_retries=0,
+        request_delay=0,
+        max_response_bytes=10000,
+        target_validator=lambda url: validate_target(url, source.allowed_hosts),
+        transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = SkatteetatenCrawler(
+            client,
+            FileCrawlArtifactRepository(tmp_path),
+            allowed_hosts=source.allowed_hosts,
+            allowed_path_prefixes=source.allowed_paths,
+            allowed_languages=source.language,
+            source_id=source.id,
+        ).crawl(CrawlRequest(url=legacy_url, max_pages=1, follow_links=False))
+    finally:
+        client.close()
+    assert result.fetched == 1
+    assert result.failed == result.skipped == 0
+    assert result.pages[0].original_url == legacy_url
+    assert result.pages[0].final_url == source.seed_url
+    assert result.pages[0].source_id == source_id
+    assert requested == ["https://www.skatteetaten.no/robots.txt", legacy_url, source.seed_url]
 
 
 def test_configured_source_has_bounded_seed_and_named_identity() -> None:
