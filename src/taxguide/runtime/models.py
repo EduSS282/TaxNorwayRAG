@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 from pydantic import Field, field_validator
 
 from taxguide.config.models import AppConfig, ConfigModel
+from taxguide.generation.vertex import vertex_origin
 
 ServiceName = Literal["generator", "embeddings", "reranker", "qdrant"]
 SERVICES: tuple[ServiceName, ...] = ("qdrant", "embeddings", "reranker", "generator")
@@ -29,6 +30,9 @@ def endpoint(value: str) -> str:
 
 
 class Connections(ConfigModel):
+    generator_provider: Literal["openai_compatible", "vertex_ai"] = "openai_compatible"
+    vertex_project: str = Field(default="", max_length=63, pattern=r"^[a-zA-Z0-9-]*$")
+    vertex_location: str = Field(default="global", max_length=63, pattern=r"^[a-z][a-z0-9-]*$")
     generator_url: str
     generator_model: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][\w./:@+-]*$")
     generator_timeout: float = Field(default=180, gt=0, le=180)
@@ -48,6 +52,9 @@ class Connections(ConfigModel):
     @classmethod
     def from_config(cls, config: AppConfig) -> "Connections":
         return cls(
+            generator_provider=config.generation.provider,
+            vertex_project=config.generation.vertex_project,
+            vertex_location=config.generation.vertex_location,
             generator_url=config.generation.base_url,
             generator_model=config.generation.model,
             generator_timeout=config.generation.timeout,
@@ -64,7 +71,12 @@ class Connections(ConfigModel):
     def apply(self, base: AppConfig) -> AppConfig:
         values = base.model_dump()
         values["generation"].update(
-            base_url=self.generator_url, model=self.generator_model, timeout=self.generator_timeout
+            base_url=self.generator_url,
+            model=self.generator_model,
+            timeout=self.generator_timeout,
+            provider=self.generator_provider,
+            vertex_project=self.vertex_project,
+            vertex_location=self.vertex_location,
         )
         values["corpus"].update(
             embedding_base_url=self.embedding_url,
@@ -82,7 +94,9 @@ class Connections(ConfigModel):
 
     def url(self, service: ServiceName) -> str:
         return {
-            "generator": self.generator_url,
+            "generator": vertex_origin(self.vertex_location)
+            if self.generator_provider == "vertex_ai"
+            else self.generator_url,
             "embeddings": self.embedding_url,
             "reranker": self.reranker_url,
             "qdrant": self.qdrant_url,
@@ -107,7 +121,14 @@ class ServiceStatus(ConfigModel):
     service: ServiceName
     url: str
     state: Literal[
-        "available", "unavailable", "starting", "stopped", "external", "in_process", "error"
+        "available",
+        "unavailable",
+        "needs_setup",
+        "starting",
+        "stopped",
+        "external",
+        "in_process",
+        "error",
     ]
     owned: bool = False
     ready: bool = False

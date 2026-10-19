@@ -1,0 +1,11 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+ENV UV_NO_DEV=1 UV_LINK_MODE=copy PATH="/app/.venv/bin:$PATH"
+
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+RUN uv sync --locked --no-dev --extra cpu-models --no-cache
+
+EXPOSE 8001
+CMD ["uvicorn", "taxguide.reranking.service:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--no-access-log"]

@@ -108,17 +108,28 @@ dejar páginas sin visitar aunque el trabajo figure finalizado. No se cuenta ni 
 
 ## Después: construir e indexar
 
-Desde la raíz, con embeddings y Qdrant disponibles, por ejemplo para tarifas:
+En el mismo `/crawler`, usa **Preparar corpus e indexar en Qdrant**:
 
-```powershell
-uv run taxguide corpus build --url-prefix "/en/rates/" --language en --dry-run
-uv run taxguide corpus build --url-prefix "/en/rates/" --language en --index
-```
+1. Pulsa **Actualizar preparación**. Comprueba colección, modelo de embeddings y chunking.
+2. Elige prefijo (`/en/rates/` para tarifas), idioma y límite de documentos (1–2000, por defecto 200).
+3. Pulsa **Revisar selección**. Solo lee metadatos; no carga modelos ni escribe vectores.
+4. Opcionalmente ejecuta **Construir sin indexar** para comprobar parsing y chunking.
+5. Vuelve a revisar, confirma la escritura en la colección mostrada y pulsa **Construir e indexar**.
+6. Sigue progreso e informe final. Descarga el resumen y abre Preguntas para verificar retrieval y respuesta.
 
-Elige los prefijos correspondientes a las secciones descargadas. Si la API usa un YAML/overlay
-personalizado, pasa los mismos archivos mediante las opciones CLI `--config`/`--overlay` del
-build. Las conexiones guardadas desde `/settings` **no se aplican al CLI**: alinea también sus
-URLs, modelo y colección antes de indexar. Véanse [corpus](corpus.md) y [años](annual-corpus.md).
+La preparación usa las conexiones guardadas de `/settings`, no un YAML separado. Necesita
+embeddings y Qdrant para indexar; construir sin indexar no necesita modelos. No guarda chunks
+como archivos. El backend calcula y envía los vectores, sin comandos del operador. La CLI opcional
+conserva sus opciones y lee su propio YAML. Véanse [corpus](corpus.md) y [años](annual-corpus.md).
+
+La adquisición y la preparación web se excluyen; un inicio concurrente devuelve 409. El progreso
+se consulta cada 2 segundos mientras el trabajo está activo. Cancelar espera al documento en curso
+y conserva escrituras; no hace rollback. El informe muestra años de documentos, tiempos y errores
+por etapa; no certifica calidad fiscal ni cuenta todos los vectores. El último resumen persiste en
+`corpus.report_directory/.web-job.json`, además del informe completo por ejecución. El HTTP omite
+rutas y mensajes brutos de excepción. No hay reanudación automática. Usa una colección nueva al
+cambiar embeddings. Al terminar escrituras se renueva el backend para reconstruir BM25 en consultas
+nuevas; las consultas ya iniciadas conservan su snapshot.
 
 ## Portátil, sobremesa y Oracle
 

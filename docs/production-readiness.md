@@ -20,6 +20,10 @@ replace the reviewed live evaluation and release evidence below.
 
 ## Build and deploy
 
+For a full Linux stack from a single file, use [single-host deployment](single-host-deployment.md).
+It includes local model bootstrap and supports server-authenticated Gemini through Vertex AI.
+The older merged Compose deployment below remains supported for externally managed models.
+
 The existing `compose.yaml` runs Qdrant alone. To add API and frontend on one private host:
 
 ```powershell

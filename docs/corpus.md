@@ -69,3 +69,12 @@ See [annual corpus workflow](annual-corpus.md) for PowerShell commands and perfo
 Wizard pages can be excluded with `--exclude-wizards`; otherwise only their
 already-rendered static HTML enters the existing parser. The command does not
 execute JavaScript or traverse wizard branches.
+
+## Frontend preparation
+
+The private `/crawler` page can preview manifest selection, build the corpus and explicitly
+index it in Qdrant using saved API connections. It shows progress, supports cancellation between
+documents, and downloads a sanitized report. No CLI vector upload is required. Existing CLI
+commands above remain available and continue to read YAML rather than saved API preferences.
+See [the frontend workflow](crawler-ui.md#después-construir-e-indexar) and
+[Fieldmind preparation](fieldmind-gcp-preparation.md) for prerequisites and limitations.

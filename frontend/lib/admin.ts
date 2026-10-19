@@ -1,5 +1,8 @@
 export type Service = "generator" | "embeddings" | "reranker" | "qdrant";
 export type Connections = {
+  generator_provider: "openai_compatible" | "vertex_ai";
+  vertex_project: string;
+  vertex_location: string;
   generator_url: string;
   generator_model: string;
   generator_timeout: number;

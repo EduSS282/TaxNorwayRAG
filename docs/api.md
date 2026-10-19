@@ -38,6 +38,7 @@ connection errors are returned as service-unavailable responses, without downstr
 | `GET /v1/metrics` | none | Per-process aggregate latency seconds by stage |
 | `POST /v1/admin` | Operator action and bearer key | Connections, dependency states, owned processes and lifecycle events |
 | `POST /v1/crawl` | Operator key; `get`, `status`, `start` or `cancel` | Local section inventory and bounded acquisition job snapshot |
+| `POST /v1/corpus` | Operator key; `get`, `preview`, `start` or `cancel` | Corpus preparation with saved connections and sanitized reports |
 
 The default mode comes from `retrieval.default_mode` (`dense` in the base config); `sparse`,
 `hybrid`, and `reranked` are also accepted. `mode: "all"` is a diagnostic option that runs all
@@ -97,10 +98,24 @@ its dependencies until one is not ready. It does not poll or infer/download miss
 
 The response contains `connections`, `revision`, `can_restore`, `allowed_origins`,
 `local_services`, `services`, and bounded `events`; draft checks also return `checks`.
+
+Service `state: needs_setup` means the endpoint responds but its selected model/collection is
+missing, empty or not ready. `ready` remains false. This differs from `unavailable`, which signals
+an unreachable/invalid endpoint. Qdrant collection discovery and empty Ollama catalogs are
+read-only checks; no collection/model is created by a readiness probe.
+
+Connections additionally include `generator_provider` (`openai_compatible` by default or
+`vertex_ai`), `vertex_project` (empty uses server ADC), and `vertex_location` (`global` by default).
+Old saved settings receive these defaults. A Vertex model must be a Gemini publisher model ID.
+The API derives the Google origin from location and applies the same destination allowlist; it
+does not use `generator_url` for Vertex. Credentials are supplied only through server ADC, never
+through this contract. Vertex checks establish credential availability without inference or
+model/quota validation, and local service start/stop is unavailable for this provider.
 `ready` is independent of process ownership. Save conflicts, owned-process configuration changes,
 and stale revisions return 409; invalid destinations/inputs return 422; process/runtime failures
 return sanitized 503 errors. Responses are not cached. Changing embedding identity requires a
-different collection and `confirm_reindex: true`; indexing itself is a separate CLI operation.
+different collection and `confirm_reindex: true`; indexing is a separate explicit action through
+`/v1/corpus` or the optional CLI.
 
 ## Crawler administration
 
@@ -111,6 +126,25 @@ with an accepted job snapshot, not a completed crawl. `cancel` requires the curr
 `get` includes inventory; `status` returns `sections: null` with just the job snapshot. Conflicts
 return 409, invalid inputs 422. Jobs do not survive process restart; artifacts do. See the full
 [crawler contract and lifecycle](crawler-ui.md#contrato-http-y-límites-operativos).
+
+## Corpus preparation contract
+
+`POST /v1/corpus` shares the operator key and origin policy; the browser uses `/api/corpus`.
+`get` returns current `revision`, `collection`, `embedding_model`, `chunk_strategy`, `max_tokens`,
+and the latest `job`. `preview` and `start` require the current connection `revision` and accept
+`url_prefix` (path only), `language` (`en`, `nb`, `nn`, or empty), and `limit` (1–2000, default 200).
+Preview returns `selection` counts without loading models or writing points. `start` defaults to
+processing only; `index: true` additionally requires `confirm_index: true`. It returns a background
+job snapshot with HTTP 200. Inputs cannot select paths, endpoints, commands, or arbitrary models.
+
+`cancel` requires the current `job_id`. States are `running`, `cancelling`, `completed`, `partial`,
+`cancelled`, and `failed`. Jobs show selected/processed/unchanged/failed documents, collection,
+embedding model and settings revision. `report` adds generated chunks, document-year counts,
+stage durations and failure categories, excluding raw errors and local paths. All responses use
+`Cache-Control: no-store`. Concurrent crawl/build jobs or stale revisions return 409; invalid
+inputs return 422; unavailable artifact storage returns sanitized 503. Cancellation retains writes
+and is checked between documents. Completed summaries persist; jobs do not resume after restart.
+External CLI writers remain operator-coordinated. See [ADR 0017](adr/0017-frontend-corpus-preparation.md).
 
 ## Logging, metrics, and tracing
 
@@ -127,7 +161,7 @@ fixed-bucket counts for HTTP requests and the retrieval, reranking, and generati
 are in memory, per process, and reset on restart. Trace spans are logged, not retained in a
 searchable backend or propagated to Qdrant/model HTTP calls. OpenTelemetry export is deferred.
 
-Only `/v1/admin` and `/v1/crawl` have operator authentication. Query/retrieval endpoints have no authentication,
+Only `/v1/admin`, `/v1/crawl`, and `/v1/corpus` have operator authentication. Query/retrieval endpoints have no authentication,
 rate limiting, CORS policy for browser clients, or TLS termination.
 Do not expose it directly to the public Internet; use loopback, a private tunnel, or an
 authenticated gateway. Run one worker on constrained local hardware unless measured otherwise:

@@ -5,12 +5,17 @@ from subprocess import SubprocessError
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
+from taxguide.corpus.management import CorpusCommand, CorpusManager, CorpusView
 from taxguide.crawling.management import CrawlCommand, CrawlConflict, CrawlManager, CrawlView
+from taxguide.domain.exceptions import TaxguideError
 from taxguide.runtime.controller import AdminRequest, ConflictError, RuntimeController
 
 
 def admin_router(
-    controller: RuntimeController | None, token: str | None, crawler: CrawlManager | None = None
+    controller: RuntimeController | None,
+    token: str | None,
+    crawler: CrawlManager | None = None,
+    corpus: CorpusManager | None = None,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -54,5 +59,19 @@ def admin_router(
             raise HTTPException(422, str(exc)) from exc
         except OSError as exc:
             raise HTTPException(503, "Cannot read crawler inventory") from exc
+
+    @router.post("/v1/corpus", dependencies=[Depends(authorize)])
+    def prepare(payload: CorpusCommand, response: Response) -> CorpusView:
+        response.headers["Cache-Control"] = "no-store"
+        if corpus is None:
+            raise HTTPException(503, "Corpus administration unavailable")
+        try:
+            return corpus.execute(payload)
+        except CrawlConflict as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        except (OSError, TaxguideError) as exc:
+            raise HTTPException(503, "Cannot read corpus; verify server artifacts") from exc
 
     return router

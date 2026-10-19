@@ -1,5 +1,16 @@
 # Ejecución distribuida en sobremesa, portátil y Oracle Free Tier
 
+La demo en una sola VM también dispone de [despliegue con imágenes publicadas](image-deployment.md).
+Con el artefacto de Actions y `.env` configurado: `docker compose pull` y
+`docker compose up -d --no-build`. Usa `compose.demo.yaml`, mantiene los volúmenes del stack de
+un host y no necesita compilar en la VM. Las pruebas de CI no demuestran calidad de modelos reales.
+
+Para una sola VM Linux ya existe [un stack completo](single-host-deployment.md), seleccionado por
+`COMPOSE_FILE=compose.single-host.yaml` en `.env`. Un único `docker compose up --build -d` inicia
+frontend, API, Qdrant, Ollama, bootstrap y reranker en el mismo host. No requiere repartir procesos
+entre estas tres máquinas. También permite elegir Gemini/Vertex AI en `/settings` con ADC del
+servidor; las pruebas deterministas no certifican acceso real a GCP ni calidad del modelo.
+
 Esta guía convierte la arquitectura actual de TaxGuide Norway en un despliegue operativo para el
 hardware disponible:
 
@@ -12,6 +23,10 @@ de autenticación; administración de servicios/crawler exige clave. Usa loopbac
 llama.cpp son procesos externos que TaxGuide consume por HTTP.
 
 ## Decisión recomendada
+
+La comprobación distingue servidor accesible sin corpus/modelo (`needs_setup`) de dependencia
+inaccesible (`unavailable`). En un host nuevo, Qdrant sin colección debe prepararse desde `/crawler`.
+Esto no exige corregir sus URLs ni abrir su puerto al navegador.
 
 Empieza con el camino interactivo completo en el sobremesa y usa las otras máquinas para descargar
 trabajo auxiliar. Esta distribución minimiza la latencia y evita que una caída de Internet impida
@@ -97,9 +112,14 @@ Si Python está en el sobremesa y accedes mediante túnel, los archivos quedan e
 Las capturas hechas por CLI en Oracle solo aparecen después de sincronizar HTML y manifiestos a
 los directorios `corpus.raw_directory` y `corpus.crawl_manifest_directory` de la API. Haz la
 sincronización sin un crawl web o build concurrente; después pulsa **Actualizar inventario**.
-La descarga no indexa: ejecuta `taxguide corpus build ... --index` en la máquina con acceso a
-embeddings/Qdrant y la misma configuración/directorios. Los cambios de `/settings` no modifican
-el YAML de ese comando. La [guía de la interfaz](frontend.md) contiene los comandos de arranque.
+La descarga no indexa. En el mismo `/crawler`, abre **Preparar corpus e indexar en Qdrant**,
+actualiza la configuración, revisa selección y confirma **Construir e indexar**. Usa las conexiones
+guardadas de `/settings`; Python debe alcanzar embeddings y Qdrant, aunque sean remotos. No necesitas
+un comando de subida de vectores. La CLI opcional sigue leyendo su propio YAML. La
+[guía de la interfaz](frontend.md) contiene los comandos de arranque.
+
+Para preparar una demostración en GCP, consulta la [lista para Pierre](fieldmind-gcp-preparation.md).
+La creación del host y la instalación de modelos siguen siendo requisitos de despliegue.
 
 ## Etapa 1: validar todo en el sobremesa
 

@@ -111,7 +111,8 @@ def test_corpus_indexing_uses_the_configured_embedder_factory(monkeypatch) -> No
         )
     )
     monkeypatch.setattr(
-        corpus, "create_embedder", lambda config: created_for.append(config) or FakeEmbedder()
+        "taxguide.corpus.composition.create_embedder",
+        lambda config: created_for.append(config) or FakeEmbedder(),
     )
     monkeypatch.setitem(
         sys.modules, "qdrant_client", SimpleNamespace(QdrantClient=FakeQdrantClient)

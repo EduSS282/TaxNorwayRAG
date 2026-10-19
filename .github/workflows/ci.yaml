@@ -16,6 +16,14 @@ jobs:
       - run: uv run mypy src
       - run: uv run pytest
       - run: docker compose -f compose.yaml -f compose.production.yaml config --quiet
+      - run: docker compose -f compose.single-host.yaml config --quiet
+        env:
+          TAXGUIDE_ADMIN_TOKEN: ci-config-validation-only-no-cloud-credentials
+      - run: docker compose -f compose.demo.yaml config --quiet
+        env:
+          TAXGUIDE_ADMIN_TOKEN: ci-config-validation-only-no-cloud-credentials
+          TAXGUIDE_IMAGE_NAMESPACE: eduss28
+          TAXGUIDE_IMAGE_TAG: sha-${{ github.sha }}
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -44,3 +52,58 @@ jobs:
           curl --retry 20 --retry-delay 2 --retry-all-errors --fail --show-error --silent -H 'Content-Type: application/json' -d '{"question":"Which NGO should I support?","mode":"dense"}' http://127.0.0.1:3000/api/query | python -c "import json,sys; assert json.load(sys.stdin)['status'] == 'clarification_required'"
       - if: always()
         run: docker compose -f compose.yaml -f compose.production.yaml down
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [quality, frontend, deployment]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: .
+            file: Dockerfile.api
+          - name: frontend
+            context: frontend
+            file: frontend/Dockerfile
+          - name: reranker
+            context: .
+            file: Dockerfile.reranker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: eduss28
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          push: true
+          tags: docker.io/eduss28/taxguide-${{ matrix.name }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=demo-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=demo-${{ matrix.name }}
+  demo-bundle:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare deployment files for this exact image release
+        env:
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          mkdir -p dist/demo
+          cp compose.demo.yaml dist/demo/
+          cp docs/image-deployment.md dist/demo/README.md
+          cp docs/single-host-deployment.md dist/demo/
+          sed -e 's/^TAXGUIDE_IMAGE_NAMESPACE=$/TAXGUIDE_IMAGE_NAMESPACE=eduss28/' -e "s/^TAXGUIDE_IMAGE_TAG=$/TAXGUIDE_IMAGE_TAG=${IMAGE_TAG}/" .env.demo.example > dist/demo/.env.demo.example
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taxguide-demo-sha-${{ github.sha }}
+          path: dist/demo/
+          include-hidden-files: true

@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -16,6 +17,7 @@ from taxguide.domain.models import Chunk, ChunkMetadata
 from taxguide.generation.base import ChatMessage
 from taxguide.generation.models import Citation, ConfidenceLevel, RagAnswer
 from taxguide.generation.service import GroundedRagService, GroundedRagStatus
+from taxguide.generation.vertex import VertexAccess, VertexAIGenerator
 from taxguide.query.tax_year import TaxYearResolutionContext
 from taxguide.retrieval.filters import RetrievalFilter
 from taxguide.rules.factory import create_tax_router
@@ -86,6 +88,48 @@ def test_service_returns_a_validated_grounded_answer() -> None:
     ]
     assert "untrusted quoted data" in generator.calls[0][0]["content"]
     assert result.final_context is None
+
+
+@pytest.mark.parametrize("valid_citation", [True, False])
+def test_vertex_completion_passes_through_existing_grounding_validation(valid_citation):
+    chunk = _chunk("a", tax_year=2026)
+    answer = _answer(chunk, tax_year=2026).model_dump(mode="json")
+    if not valid_citation:
+        answer["citations"][0]["chunk_id"] = "b" * 64
+
+    def respond(request):
+        payload = json.loads(request.content)
+        assert chunk.text in payload["contents"][0]["parts"][0]["text"]
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "finishReason": "STOP",
+                        "content": {"parts": [{"text": json.dumps(answer)}]},
+                    }
+                ]
+            },
+        )
+
+    generator = VertexAIGenerator(
+        "gemini-2.5-flash",
+        token_source=lambda: VertexAccess("test-token", "test-project"),
+        client=httpx.Client(transport=httpx.MockTransport(respond)),
+    )
+    service = GroundedRagService(
+        router=create_tax_router(),
+        retriever=RecordingRetriever([ScoredChunk(chunk=chunk, score=0.9)]),
+        context_builder=ContextBuilder(max_tokens=100),
+        generator=generator,
+        temperature=0.1,
+        max_tokens=1000,
+    )
+    result = service.answer("Explain Norwegian wealth tax for 2026.")
+    assert result.generator_model == "gemini-2.5-flash"
+    assert result.status is (
+        GroundedRagStatus.ANSWERED if valid_citation else GroundedRagStatus.ABSTAINED
+    )
 
 
 def test_language_and_opt_in_context_reach_actual_generation() -> None:

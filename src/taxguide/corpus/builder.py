@@ -60,6 +60,8 @@ class CorpusBuilder:
         raw_directory: Path,
         source_manifest_directory: Path,
         vector_collection: str | None = None,
+        cancelled: Callable[[], bool] = lambda: False,
+        progress: Callable[[int, int, int], None] = lambda processed, unchanged, failed: None,
     ) -> CorpusBuildReport:
         started_at = self.clock()
         failures: list[CorpusFailure] = []
@@ -70,6 +72,9 @@ class CorpusBuilder:
         documents_by_tax_year: Counter[str] = Counter()
         stage_seconds: dict[str, float] = {}
         for manifest in selection.manifests:
+            progress(processed, unchanged, len(failures))
+            if cancelled():
+                break
             url = source_version_url(manifest)
             if url is None:
                 failures.append(
@@ -140,6 +145,7 @@ class CorpusBuilder:
             chunks_generated += len(chunks)
             document_ids.append(manifest.document_id)
         completed_at = self.clock()
+        progress(processed, unchanged, len(failures))
         return CorpusBuildReport(
             run_id=str(uuid4()),
             started_at=started_at,

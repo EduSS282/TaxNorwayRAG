@@ -1,31 +1,24 @@
 import json
 import logging
-from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated
 
 import typer
 
 from taxguide.chunking.base import Chunker
-from taxguide.cli.chunk import _chunker
+from taxguide.chunking.factory import create_chunker as _chunker
 from taxguide.config.loader import load_config
 from taxguide.config.models import AppConfig
 from taxguide.corpus.builder import CorpusBuilder
-from taxguide.corpus.models import CorpusFilters, CorpusSelection, CrawlManifest
+from taxguide.corpus.composition import indexing as _indexing
+from taxguide.corpus.composition import pipeline_factory as _pipeline_factory
+from taxguide.corpus.models import CorpusFilters, CorpusSelection
 from taxguide.corpus.selector import ManifestCorpusSelector, effective_url
 from taxguide.corpus.storage import FileCorpusReportRepository, FileCrawlManifestRepository
 from taxguide.domain.enums import PageType
 from taxguide.domain.exceptions import CorpusError, TaxguideError
 from taxguide.embeddings.base import Embedder
-from taxguide.embeddings.factory import create_embedder
-from taxguide.indexing.signature import index_signature
-from taxguide.ingestion.normalizer import Normalizer
-from taxguide.ingestion.pipeline import IngestionPipeline
-from taxguide.ingestion.skatteetaten_parser import SkatteetatenHtmlParser
-from taxguide.sources.local import LocalHtmlSource
 from taxguide.vectorstores.base import VectorStore
-from taxguide.vectorstores.qdrant import QdrantClient as QdrantClientProtocol
-from taxguide.vectorstores.qdrant import QdrantVectorStore
 
 app = typer.Typer(no_args_is_help=True)
 
@@ -35,35 +28,6 @@ def _settings(config: Path | None, overlay: Path | None) -> AppConfig:
     if config or base.exists():
         return load_config(base, overlay)
     return load_config(overlay) if overlay is not None else AppConfig()
-
-
-def _pipeline_factory(settings: AppConfig) -> Callable[[CrawlManifest], IngestionPipeline]:
-    def factory(manifest: CrawlManifest) -> IngestionPipeline:
-        return IngestionPipeline(
-            LocalHtmlSource(clock=lambda: manifest.retrieved_at),
-            SkatteetatenHtmlParser(
-                preserve_links=settings.ingestion.preserve_links,
-                preserve_headings=settings.ingestion.preserve_headings,
-            ),
-            Normalizer(),
-        )
-
-    return factory
-
-
-def _indexing(settings: AppConfig, collection: str | None = None) -> tuple[Embedder, VectorStore]:
-    try:
-        from qdrant_client import QdrantClient
-    except ImportError as exc:
-        raise CorpusError("Indexing requires the optional 'qdrant-client' dependency") from exc
-    embedder = create_embedder(settings.corpus)
-    store = QdrantVectorStore(
-        cast(QdrantClientProtocol, QdrantClient(url=settings.corpus.qdrant_url)),
-        collection_name=collection or settings.corpus.qdrant_collection,
-        index_signature=index_signature(settings, embedder.model_id),
-    )
-    store.ensure_collection(embedder.dimension)
-    return embedder, cast(VectorStore, store)
 
 
 def _limited(selection: CorpusSelection, limit: int | None) -> CorpusSelection:

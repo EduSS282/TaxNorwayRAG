@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ConfigModel(BaseModel):
@@ -69,10 +69,10 @@ class RetrievalConfig(ConfigModel):
 
 
 class GenerationConfig(ConfigModel):
-    """Configuration for the constrained local generation profile."""
+    """Configuration for local or Vertex AI grounded generation."""
 
     model_profile: Literal["portable", "balanced", "quality"] = "portable"
-    provider: Literal["openai_compatible"] = "openai_compatible"
+    provider: Literal["openai_compatible", "vertex_ai"] = "openai_compatible"
     base_url: str = Field(default="http://127.0.0.1:8080", min_length=1)
     model: str = Field(default="Qwen/Qwen3-4B-Instruct-2507", min_length=1)
     timeout: float = Field(default=180.0, gt=0)
@@ -81,6 +81,18 @@ class GenerationConfig(ConfigModel):
     temperature: float = Field(default=0.1, ge=0, le=2)
     max_tokens: int = Field(default=1000, ge=1)
     structured_output: bool = True
+    vertex_project: str = Field(default="", max_length=63, pattern=r"^[a-zA-Z0-9-]*$")
+    vertex_location: str = Field(default="global", max_length=63, pattern=r"^[a-z][a-z0-9-]*$")
+    vertex_thinking_budget: int | None = Field(default=None, ge=-1)
+
+    @model_validator(mode="after")
+    def validate_vertex_model(self) -> "GenerationConfig":
+        if self.provider == "vertex_ai":
+            import re
+
+            if not re.fullmatch(r"gemini-[a-zA-Z0-9._-]+", self.model):
+                raise ValueError("Vertex AI requires a Gemini publisher model ID")
+        return self
 
 
 class AppConfig(ConfigModel):

@@ -27,7 +27,7 @@ createServer(async (request, response) => {
   let body = "";
   for await (const part of request) body += part;
   const payload = JSON.parse(body);
-  if (["/v1/admin", "/v1/crawl"].includes(request.url))
+  if (["/v1/admin", "/v1/crawl", "/v1/corpus"].includes(request.url))
     return response.end(
       JSON.stringify({
         authorization: request.headers.authorization || null,

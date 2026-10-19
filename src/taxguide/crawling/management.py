@@ -4,7 +4,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from threading import Event, RLock, Thread
+from threading import Event, Lock, RLock, Thread
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -114,6 +114,7 @@ class CrawlManager:
         self._thread: Thread | None = None
         self._job: CrawlJob | None = None
         self._closed = False
+        self.writer_lock = Lock()
 
     def _sources(self) -> tuple[SourceDefinition, ...]:
         try:
@@ -208,6 +209,8 @@ class CrawlManager:
         with self._lock:
             if self._closed or (self._thread is not None and self._thread.is_alive()):
                 raise CrawlConflict("A crawl is already active or the API is shutting down")
+            if not self.writer_lock.acquire(blocking=False):
+                raise CrawlConflict("A corpus build is active; wait before crawling")
             self._cancel.clear()
             self._job = CrawlJob(
                 id=uuid4().hex,
@@ -252,6 +255,7 @@ class CrawlManager:
                     if section.state in {"pending", "running"}:
                         section.state = "cancelled" if self._cancel.is_set() else "failed"
                 job.finished_at = datetime.now(UTC)
+            self.writer_lock.release()
 
     def _crawl(self, source: SourceDefinition, section: SectionProgress, job: CrawlJob) -> None:
         def validate(url: str) -> None:

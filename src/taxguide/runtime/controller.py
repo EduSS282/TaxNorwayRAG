@@ -64,7 +64,13 @@ class RuntimeController:
         with self.lock:
             return self._config, self._backend
 
+    def refresh_backend(self) -> None:
+        """New requests must rebuild sparse caches after an index write."""
+        with self.lock:
+            self._backend = ConfiguredBackend(self._config)
+
     def validate_destinations(self, connections: Connections) -> None:
+        connections.apply(self.base)  # Validate the selected provider/model before any probe.
         for service in SERVICES:
             if connections.url(service) not in self.allowed_origins:
                 raise ValueError(
@@ -166,7 +172,9 @@ class RuntimeController:
                         )
                     self.statuses[service] = status
                     # Never continue loading models after a dependency fails/is still starting.
-                    if not status.ready and status.state != "in_process":
+                    # A reachable Qdrant without a corpus still allows preparing embedding services.
+                    setup_only = service == "qdrant" and status.state == "needs_setup"
+                    if not status.ready and status.state != "in_process" and not setup_only:
                         break
             elif request.action == "get":
                 # Explicit refresh only: no polling, model loading or automatic start.
