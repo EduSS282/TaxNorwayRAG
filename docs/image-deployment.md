@@ -49,6 +49,11 @@ First startup still downloads Qwen embeddings, optional local generation weights
 weights into persistent volumes. The images do not contain those weights. Bootstrap needs
 outbound network access and can take time; the reachable UI does not mean models are ready.
 
+Source catalog corrections are bundled in the API image. Select the corrected release tag before
+pulling and recreating containers; pulling an older pinned tag cannot update its catalog. Refresh
+the crawler inventory after restarting the API. A custom `/app/configs` mount overrides the bundled
+catalog and must be updated separately. Corpus data and index volumes survive image updates.
+
 Only the frontend listens on host loopback at `http://127.0.0.1:3000`. Provide a private tunnel,
 VPN or authenticated gateway; query endpoints have no built-in user authentication. Configure
 Vertex and check services in `/settings`, acquire/index sources in `/crawler`, then rehearse

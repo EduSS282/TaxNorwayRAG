@@ -92,7 +92,12 @@ def test_added_sections_can_be_selected_crawled_and_counted(manager):
     assert [section.source_id for section in view.job.sections] == source_ids
     assert all(section.fetched == 1 for section in view.job.sections)
     inventory = {section.id: section for section in view.sections}
-    assert all(inventory[source_id].downloaded == 1 for source_id in source_ids)
+    expected_counts = dict.fromkeys(source_ids, 1)
+    # The current abroad tree includes the foreign-worker subsection. Inventory is URL-scoped.
+    expected_counts["skatteetaten-abroad-en"] = 2
+    assert {
+        source_id: inventory[source_id].downloaded for source_id in source_ids
+    } == expected_counts
     assert inventory[RATES].downloaded == 0
 
 
