@@ -2,28 +2,14 @@
 
 import json
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import typer
 from pydantic import ValidationError
 
-from taxguide.chunking.base import Chunker
-from taxguide.chunking.fixed import FixedTokenChunker
-from taxguide.chunking.recursive import RecursiveChunker
-from taxguide.chunking.structural import StructuralChunker
+from taxguide.chunking.factory import Strategy
+from taxguide.chunking.factory import create_chunker as _chunker
 from taxguide.domain.models import Document
-
-Strategy = Literal["fixed", "recursive", "structural"]
-
-
-def _chunker(strategy: Strategy, max_tokens: int, overlap_tokens: int) -> Chunker:
-    if strategy == "fixed":
-        return FixedTokenChunker(max_tokens=max_tokens, overlap_tokens=overlap_tokens)
-    if overlap_tokens:
-        raise ValueError("overlap_tokens is supported only by the fixed strategy")
-    if strategy == "recursive":
-        return RecursiveChunker(max_tokens=max_tokens)
-    return StructuralChunker(max_tokens=max_tokens)
 
 
 def chunk(

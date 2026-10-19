@@ -4,6 +4,8 @@ from collections.abc import Callable
 
 import httpx
 
+from taxguide.generation.openai_compatible import GenerationError
+from taxguide.generation.vertex import ADCTokenSource
 from taxguide.runtime.models import Connections, ServiceName, ServiceStatus
 
 Probe = Callable[[ServiceName, Connections], ServiceStatus]
@@ -17,6 +19,21 @@ def check(
     service: ServiceName, connections: Connections, *, transport: httpx.BaseTransport | None = None
 ) -> ServiceStatus:
     url = connections.url(service)
+    if service == "generator" and connections.generator_provider == "vertex_ai":
+        try:
+            access = ADCTokenSource(timeout=3)()
+            ready = bool(connections.vertex_project or access.project)
+            detail = "ADC available; model access, region, quota and generation not tested"
+        except GenerationError:
+            ready = False
+            detail = "Vertex AI ADC unavailable; configure credentials on the API host"
+        return ServiceStatus(
+            service=service,
+            url=url,
+            state="available" if ready else "unavailable",
+            ready=ready,
+            detail=detail,
+        )
     if (service == "embeddings" and connections.embedding_provider == "local") or (
         service == "reranker" and connections.reranker_provider == "local"
     ):
@@ -34,6 +51,8 @@ def check(
                 response = client.get(f"{url}/v1/models")
                 response.raise_for_status()
                 models = response.json()["data"]
+                if models is None:  # Ollama advertises null while no models are installed.
+                    models = []
                 ready = any(item.get("id") == connections.generator_model for item in models)
                 detail = (
                     "Model advertised; generation not tested"
@@ -49,9 +68,23 @@ def check(
                 detail = (
                     "Model installed; not loaded by this check"
                     if ready
-                    else "Model not installed; download it outside the app"
+                    else "Ollama reachable; model missing. Wait for deployment bootstrap."
                 )
             elif service == "qdrant":
+                response = client.get(f"{url}/collections")
+                response.raise_for_status()
+                collections = response.json()["result"]["collections"]
+                if not any(item["name"] == connections.qdrant_collection for item in collections):
+                    return ServiceStatus(
+                        service=service,
+                        url=url,
+                        state="needs_setup",
+                        ready=False,
+                        detail=(
+                            "Qdrant reachable; collection missing. "
+                            "Build and index from Corpus / Crawler."
+                        ),
+                    )
                 response = client.get(f"{url}/collections/{connections.qdrant_collection}")
                 response.raise_for_status()
                 info = response.json()["result"]
@@ -59,7 +92,7 @@ def check(
                 detail = (
                     "Collection has points; embedding compatibility not tested"
                     if ready
-                    else "Collection empty or not green; index it before querying"
+                    else "Qdrant reachable; collection empty or not green. Index before querying."
                 )
             else:
                 response = client.get(f"{url}/health")
@@ -69,7 +102,11 @@ def check(
         return ServiceStatus(
             service=service,
             url=url,
-            state="available" if ready else "unavailable",
+            state="available"
+            if ready
+            else (
+                "needs_setup" if service in {"qdrant", "embeddings", "generator"} else "unavailable"
+            ),
             ready=ready,
             detail=detail,
         )

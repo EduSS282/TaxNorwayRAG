@@ -22,6 +22,7 @@ from taxguide.api.models import (
 )
 from taxguide.config.loader import load_config
 from taxguide.config.models import AppConfig
+from taxguide.corpus.management import CorpusManager
 from taxguide.crawling.management import CrawlManager
 from taxguide.domain.exceptions import (
     CrossYearRetrievalError,
@@ -65,6 +66,7 @@ _LOGGABLE_PATHS = {
     "/v1/query",
     "/v1/admin",
     "/v1/crawl",
+    "/v1/corpus",
     "/openapi.json",
     "/docs",
     "/redoc",
@@ -80,6 +82,7 @@ def create_app(
     runtime: RuntimeController | None = None,
     admin_token: str | None = None,
     crawler: CrawlManager | None = None,
+    corpus: CorpusManager | None = None,
 ) -> FastAPI:
     """Compose a testable HTTP boundary without loading models or contacting Qdrant."""
     config = settings or (runtime.base if runtime is not None else _settings())
@@ -95,6 +98,9 @@ def create_app(
         crawl_manager = CrawlManager(
             config, Path(environ.get("TAXGUIDE_SOURCES_FILE", "configs/sources.yaml"))
         )
+    corpus_manager = corpus
+    if corpus_manager is None and controller is not None and crawl_manager is not None and token:
+        corpus_manager = CorpusManager(controller, crawl_manager)
 
     def active() -> tuple[AppConfig, ApiBackend]:
         return controller.snapshot() if controller is not None else (config, service)
@@ -108,6 +114,8 @@ def create_app(
                 crawl_manager.store.acquire()
             yield
         finally:
+            if corpus_manager is not None:
+                await to_thread(corpus_manager.close)
             if crawl_manager is not None:
                 await to_thread(crawl_manager.close)
                 crawl_manager.store.release()
@@ -118,7 +126,7 @@ def create_app(
     registry = metrics or MetricsRegistry()
     package_version = _version()
     application = FastAPI(title="TaxGuide Norway API", version=package_version, lifespan=lifespan)
-    application.include_router(admin_router(controller, token, crawl_manager))
+    application.include_router(admin_router(controller, token, crawl_manager, corpus_manager))
 
     @application.middleware("http")
     async def observe_request(

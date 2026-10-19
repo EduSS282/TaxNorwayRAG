@@ -25,6 +25,24 @@ local question interface, cited sources, tax-year/language controls, and a devel
 approval remain pending. Deterministic checks do not establish fiscal accuracy.
 See the [repository audit](docs/repository-audit.md) for evidence and remaining gates.
 
+For Pierre’s environment checklist and browser demonstration, see
+[Fieldmind GCP preparation](docs/fieldmind-gcp-preparation.md).
+
+The demo can also use prebuilt Docker Hub images with `compose.demo.yaml`: copy the deployment
+artifact's `.env.demo.example` to `.env`, set the operator token, then run `docker compose pull`
+and `docker compose up -d --no-build`. Pushes to `main` publish SHA-tagged Linux `amd64` images
+after the Quality gates pass, using the repository's `DOCKERHUB_TOKEN` secret. See
+[published-image deployment](docs/image-deployment.md) for setup and the release bundle.
+
+For a complete Linux VM stack, copy `.env.single-host.example` to `.env`, set a private operator
+token, then run `docker compose up --build -d`. The standalone file starts frontend, API, Qdrant,
+Ollama model bootstrap and reranking. `/settings` also supports Gemini through Vertex AI using
+server-side ADC. See [single-host deployment](docs/single-host-deployment.md) for setup, persistence,
+first-download behavior and GCP permissions.
+
+On first boot, **Conectado · Falta preparar** identifies reachable services still missing a model
+or indexed collection. Wait for model bootstrap and build/index the corpus through `/crawler`.
+
 Start with [installation](#installation), [local workflow](#local-workflow), and
 [opening the app](#open-the-app). Operational details live in the linked runbooks.
 
@@ -56,10 +74,15 @@ Start with [installation](#installation), [local workflow](#local-workflow), and
 - Opt-in operator settings for saved model/Qdrant connections, dependency checks, and safe
   start/stop of preconfigured services on the API host.
 - Authenticated crawler page with section selection, verified local capture inventory, bounded
-  background downloads, progress and cancellation; indexing remains a separate CLI operation.
+  background downloads, progress and cancellation.
+- Frontend corpus selection, parsing/chunking builds and confirmed Qdrant indexing using saved
+  API connections, with background progress, cancellation and downloadable preparation reports.
 - PII-minimized application logs, conservative retrieved-instruction filtering, and an offline
   retrieval/generation report regression gate; these do not establish fiscal accuracy.
-- Private single-host Docker Compose files for API, frontend and Qdrant; models remain external.
+- The original two-file private Docker Compose deployment for API, frontend and Qdrant, with external models.
+- A separate standalone Compose stack with model bootstrap and persistent caches on one Linux VM.
+- Native Vertex AI Gemini text generation with renewable ADC credentials, browser provider/project/
+  location selection, and the existing answer/citation validation.
 
 See [current architecture](docs/architecture.md) for component boundaries and
 [grounded-generation status](docs/generation.md) for the implemented contract and remaining
@@ -86,6 +109,9 @@ For the optional in-process `sentence-transformers` embedding/reranking adapters
 standalone Python reranker service, use `uv sync --locked --extra local-models` and keep the extra
 in `uv run --extra local-models ...` commands. Switching back to `uv sync --locked` removes that
 extra without changing corpus or index data.
+
+For CPU-only installations use `cpu-models` instead of `local-models`; this selects PyTorch wheels
+from its official CPU index. The single-host reranker image uses this extra and omits download caches.
 
 The Python test suite does not require a GPU or live model server. Managed external runtimes
 require weights installed beforehand. The optional in-process sentence-transformers adapters may
@@ -164,11 +190,13 @@ to open the desktop-hosted app from the laptop through a private tunnel.
 Open **http://127.0.0.1:3000/settings** for connections and local services. Administration is
 disabled until the API has an operator key; executable/model paths must be configured in a trusted
 local profile. Follow [runtime management](docs/runtime-management.md) for first-time setup.
-“Local” means the Python API machine, not the browser machine. Model downloads and corpus indexing
-remain manual; remote endpoints can be used and checked, but not remotely started or stopped.
+“Local” means the Python API machine, not the browser machine. Model downloads remain manual;
+remote endpoints can be used and checked, but not remotely started or stopped. Corpus preparation
+and vector uploads run from the crawler page using saved connections.
 
 Open **http://127.0.0.1:3000/crawler** to select official sections and inspect existing downloads.
-It uses the same operator key, downloads on the API machine, and needs no model services.
+It uses the same operator key and downloads on the API machine without model services. Its
+preparation panel can then build and index captures; indexing needs embeddings and Qdrant.
 Downloaded pages are not proof of complete coverage or indexing. See [crawler UI](docs/crawler-ui.md)
 for startup, annual-rate selection, progress, cancellation and the subsequent corpus build.
 
@@ -285,7 +313,9 @@ catalog changes; downloads still require explicit selection, with at most eight 
 
 ## Current limitations and deferred work
 
-- Model installation/downloads, corpus indexing, and remote service startup remain operator steps.
+- Host provisioning and remote service startup remain deployment prerequisites. The standalone
+  Compose stack downloads its configured models; native-process profiles require preinstalled weights.
+  Corpus indexing is available in the frontend; formal evaluation and alias maintenance remain CLI tasks.
   Optional local start/stop requires trusted profiles and one API worker.
 - The UI is local/private. Only runtime administration has operator authentication; query endpoints
   remain unauthenticated. There is no chat persistence or public deployment.

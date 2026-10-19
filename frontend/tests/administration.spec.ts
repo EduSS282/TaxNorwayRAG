@@ -2,6 +2,9 @@ import { expect, test } from "@playwright/test";
 
 const key = "test-only-administration-key-0123456789";
 const connections = {
+  generator_provider: "openai_compatible",
+  vertex_project: "",
+  vertex_location: "global",
   generator_url: "http://127.0.0.1:8080",
   generator_model: "llm",
   generator_timeout: 180,
@@ -14,6 +17,47 @@ const connections = {
   qdrant_url: "http://127.0.0.1:6333",
   qdrant_collection: "taxguide",
 };
+
+test("reachable Qdrant without a collection explains the next preparation step", async ({ page }) => {
+  await page.route("**/api/admin", (route) => route.fulfill({ json: {
+    connections, revision: "rev", can_restore: false, allowed_origins: [], local_services: [],
+    services: [{ service: "qdrant", url: "http://qdrant:6333", state: "needs_setup",
+      owned: false, can_start: false, ready: false,
+      detail: "Qdrant reachable; collection missing. Build and index from Corpus / Crawler." }],
+    events: [],
+  } }));
+  await page.goto("/settings");
+  await page.getByLabel("Clave de administración").fill(key);
+  await page.getByRole("button", { name: "Desbloquear", exact: true }).click();
+  await expect(page.getByText("Qdrant · Conectado · Falta preparar", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Qdrant reachable; collection missing/)).toBeVisible();
+});
+
+test("Vertex provider, project and location are saved without cloud credentials", async ({ page }) => {
+  let saved: Record<string, unknown> | null = null;
+  await page.route("**/api/admin", (route) => {
+    const command = route.request().postDataJSON();
+    if (command.action === "save") saved = command.connections;
+    return route.fulfill({ json: {
+      connections: saved ?? connections, revision: "rev", can_restore: false,
+      allowed_origins: ["https://aiplatform.googleapis.com"], local_services: [],
+      services: [], events: [],
+    } });
+  });
+  await page.goto("/settings");
+  await page.getByLabel("Clave de administración").fill(key);
+  await page.getByRole("button", { name: "Desbloquear", exact: true }).click();
+  await page.getByLabel("Proveedor del LLM").selectOption("vertex_ai");
+  await expect(page.getByLabel("Dirección del LLM", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Modelo LLM (alias del servidor)", { exact: true }).fill("gemini-2.5-flash");
+  await page.getByLabel("Proyecto GCP (vacío usa ADC)").fill("fieldmind-project");
+  await page.getByRole("button", { name: "Guardar y aplicar" }).click();
+  await expect(page.getByText(/Configuración aplicada/)).toBeVisible();
+  expect(saved).toMatchObject({ generator_provider: "vertex_ai", vertex_project: "fieldmind-project",
+    vertex_location: "global", generator_model: "gemini-2.5-flash" });
+  expect(JSON.stringify(saved)).not.toContain("Bearer");
+  expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
+});
 
 test("authenticated settings save, draft probe, rollback, start and confirmed stop", async ({
   page,

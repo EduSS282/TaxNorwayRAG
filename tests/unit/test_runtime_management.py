@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 
 from taxguide.api.app import create_app
 from taxguide.config.models import AppConfig
+from taxguide.generation.openai_compatible import GenerationError
+from taxguide.generation.vertex import VertexAccess
 from taxguide.runtime.controller import AdminRequest, ConflictError, RuntimeController
 from taxguide.runtime.models import Connections, LaunchProfile, LocalProfiles, ServiceStatus
 from taxguide.runtime.probes import check
@@ -111,6 +113,67 @@ def test_atomic_save_replaces_backend_and_restores_settings(control):
     assert control.snapshot()[0].generation.model == config_before.generation.model
     restarted = RuntimeController(control.base, control.store, control.supervisor)
     assert restarted.state.current == control.state.current
+
+
+def test_vertex_settings_round_trip_and_remote_generator_never_launches(control, monkeypatch):
+    control.allowed_origins.add("https://aiplatform.googleapis.com")
+    changed = control.state.current.model_copy(
+        update={
+            "generator_provider": "vertex_ai",
+            "generator_model": "gemini-2.5-flash",
+            "vertex_project": "fieldmind-project",
+            "vertex_location": "global",
+        }
+    )
+    command(control, "save", connections=changed)
+    config = control.snapshot()[0].generation
+    assert config.provider == "vertex_ai"
+    assert config.vertex_project == "fieldmind-project"
+    assert control.state.current.url("generator") == "https://aiplatform.googleapis.com"
+    assert not control.supervisor.can_start("generator", changed)
+    with pytest.raises(ValueError, match="No matching local"):
+        command(control, "start", service="generator")
+    assert control.store.read().current.generator_provider == "vertex_ai"
+    command(control, "restore")
+    assert control.snapshot()[0].generation.provider == "openai_compatible"
+
+
+def test_vertex_origin_allowlist_blocks_region_changes_before_adc_discovery(control):
+    draft = control.state.current.model_copy(
+        update={
+            "generator_provider": "vertex_ai",
+            "generator_model": "gemini-2.5-flash",
+            "vertex_location": "europe-west4",
+        }
+    )
+    with pytest.raises(ValueError, match="Destination not authorized"):
+        command(control, "check", connections=draft)
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_vertex_probe_checks_adc_without_model_inference(control, monkeypatch, available):
+    draft = control.state.current.model_copy(
+        update={
+            "generator_provider": "vertex_ai",
+            "generator_model": "gemini-2.5-flash",
+        }
+    )
+
+    def access():
+        if not available:
+            raise GenerationError("ADC unavailable")
+        return VertexAccess("test-token", "test-project")
+
+    monkeypatch.setattr("taxguide.runtime.probes.ADCTokenSource", lambda **_: access)
+    result = check(
+        "generator",
+        draft,
+        transport=httpx.MockTransport(lambda _: pytest.fail("No model HTTP probe")),
+    )
+    assert result.ready is available
+    assert "test-token" not in result.model_dump_json()
+    if available:
+        assert "generation not tested" in result.detail
 
 
 def test_failed_write_and_stale_revision_leave_active_backend_untouched(control, monkeypatch):
@@ -392,12 +455,52 @@ def test_probes_read_only_and_check_configured_resources(control, service, paylo
 
     def respond(request):
         requests.append(request)
+        if service == "qdrant" and request.url.path == "/collections":
+            return httpx.Response(
+                200,
+                json={
+                    "result": {"collections": [{"name": control.state.current.qdrant_collection}]}
+                },
+            )
         return httpx.Response(200, json=payload)
 
     result = check(service, control.state.current, transport=httpx.MockTransport(respond))
     assert result.ready is ready
     assert all(request.method == "GET" for request in requests)
-    assert len(requests) == 1
+    assert len(requests) == (2 if service == "qdrant" else 1)
+
+
+@pytest.mark.parametrize(
+    "service,payload",
+    [
+        ("qdrant", {"result": {"collections": []}}),
+        ("generator", {"object": "list", "data": None}),
+        ("embeddings", {"models": []}),
+    ],
+)
+def test_reachable_empty_services_need_setup_not_network_repair(control, service, payload):
+    result = check(
+        service,
+        control.state.current,
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload)),
+    )
+    assert result.state == "needs_setup"
+    assert not result.ready
+    if service == "qdrant":
+        assert "Qdrant reachable" in result.detail
+        assert "Corpus / Crawler" in result.detail
+
+
+def test_prepare_continues_past_reachable_qdrant_without_corpus(control):
+    def checker(service, connections):
+        if service == "qdrant":
+            return ServiceStatus(service=service, url=connections.url(service), state="needs_setup")
+        return available(service, connections)
+
+    control.supervisor.checker = checker
+    command(control, "prepare", mode="dense")
+    assert control.supervisor.launcher.calls == ["qdrant", "embeddings", "generator"]
+    assert not control.statuses["qdrant"].ready
 
 
 @pytest.mark.parametrize("status", [302, 401, 404, 503])

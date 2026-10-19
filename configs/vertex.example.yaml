@@ -1,0 +1,10 @@
+# Example overlay for CLI/API outside the standalone stack. No credentials belong here.
+generation:
+  provider: vertex_ai
+  model: gemini-2.5-flash
+  vertex_project: ""  # Inferred from server ADC / GOOGLE_CLOUD_PROJECT when empty.
+  vertex_location: global
+  vertex_thinking_budget: 0  # Compatible Flash models only; use null otherwise.
+  timeout: 180.0
+  structured_output: true
+  max_tokens: 4096

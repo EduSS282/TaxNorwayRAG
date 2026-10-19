@@ -17,6 +17,30 @@ services are separate processes. TaxGuide does not install models or create tunn
 operator boundary can supervise preconfigured local services on the API host; remote services
 remain externally managed.
 
+The standalone `compose.single-host.yaml` is an alternative deployment boundary on one Linux host.
+It starts the full set of containers and explicitly downloads model weights through an Ollama
+initializer and reranker startup. Model caches and application data persist in named volumes.
+Only the frontend port is published to loopback; Compose owns service lifecycle. Native-process
+settings do not adopt these containers. See [single-host deployment](single-host-deployment.md).
+
+`compose.demo.yaml` preserves those services and volumes while using published Linux `amd64`
+images instead of building on the host. The API image bundles default configuration and the
+source catalog. Quality CI publishes three commit-tagged Docker Hub images on successful `main`
+pushes, then emits deployment files for that version. Models and corpus remain persistent runtime
+data, and credentials remain host-owned. See [ADR 0019](adr/0019-published-demo-images.md) and
+[image deployment](image-deployment.md).
+
+Readiness distinguishes `needs_setup` (reachable but missing the selected model/corpus) from
+`unavailable`. An empty Qdrant must not be presented as a broken network connection; it allows
+preparing embedding services while retrieval remains unready until frontend indexing.
+
+`VertexAIGenerator` implements the same `Generator` protocol through Google's native text
+`generateContent` API. Project/location select a validated Google origin, subject to the runtime
+allowlist. ADC discovery and token refresh happen lazily on the API host; cloud secrets never enter
+the browser or saved connections. Pydantic and citation/year validation remain downstream of both
+generation providers. Gemini embeddings and managed Vertex retrieval are not included. See
+[ADR 0018](adr/0018-single-host-compose-and-vertex.md).
+
 The current CLI boundary includes grounded generation:
 
 ```text
@@ -35,7 +59,7 @@ remaining exact evidence is JSON-encoded in the prompt and citations are validat
 This is a conservative defense, not proof of semantic faithfulness; see the
 [threat model](threat-model.md).
 The Next.js App Router frontend is a separate Node process. The browser posts only to its
-same-origin `/api/query`, `/api/retrieve`, `/api/admin`, and `/api/crawl` handlers, which forward JSON to a fixed server-side
+same-origin `/api/query`, `/api/retrieve`, `/api/admin`, `/api/crawl`, and `/api/corpus` handlers, which forward JSON to a fixed server-side
 `TAXGUIDE_API_URL`. No Python/domain code is duplicated in the frontend. There is no authenticated
 public deployment. See [API](api.md), [frontend](frontend.md), ADR 0009 and ADR 0010.
 
@@ -80,6 +104,16 @@ on restart. Normal shutdown cancels and joins the worker. CLI writers and extern
 must remain mutually exclusive with web acquisition. No models or Qdrant are involved, and
 inventory does not assert indexing, completeness or freshness. See [crawler UI](crawler-ui.md)
 and [ADR 0014](adr/0014-operator-crawl-jobs.md).
+
+The preparation panel on `/crawler` uses authenticated `/v1/corpus` jobs over `CorpusBuilder`.
+It previews metadata selection without loading models and snapshots saved runtime connections
+for parsing, chunking, embedding and confirmed Qdrant writes. It shares a writer lock with
+acquisition. Progress/cancellation occurs between documents; writes are incremental, not atomic
+collection replacement. Reports and the last job summary persist on the API host; the HTTP view
+omits local paths and raw failure messages. After index writes, new query requests receive a new
+lazy backend so sparse caches rebuild. Existing in-flight snapshots can remain older. See
+[ADR 0017](adr/0017-frontend-corpus-preparation.md) and
+[the Fieldmind environment checklist](fieldmind-gcp-preparation.md).
 
 ## Offline pipeline
 

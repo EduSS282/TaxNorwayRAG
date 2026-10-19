@@ -19,6 +19,8 @@ const fields: { key: keyof Connections; label: string; type?: string }[] = [
   { key: "generator_url", label: "Dirección del LLM", type: "url" },
   { key: "generator_model", label: "Modelo LLM (alias del servidor)" },
   { key: "generator_timeout", label: "Timeout LLM (segundos)", type: "number" },
+  { key: "vertex_project", label: "Proyecto GCP (vacío usa ADC)" },
+  { key: "vertex_location", label: "Ubicación Vertex AI" },
   { key: "embedding_url", label: "Dirección de embeddings", type: "url" },
   { key: "embedding_model", label: "Modelo de embeddings" },
   { key: "reranker_url", label: "Dirección del reranker", type: "url" },
@@ -31,7 +33,7 @@ function Status({ item }: { item: ServiceStatus }) {
   return (
     <div className="runtime-status">
       <strong>
-        {names[item.service]} · {item.state}
+        {names[item.service]} · {item.state === "needs_setup" ? "Conectado · Falta preparar" : item.state}
       </strong>
       <p>
         {item.ready ? "Comprobación disponible" : "Preparación no verificada"} ·{" "}
@@ -170,13 +172,35 @@ export function RuntimeSettings() {
             </p>
             <fieldset disabled={busy}>
               <div className="runtime-fields">
-                {fields.map((field) => (
+                <div>
+                  <label htmlFor="generator-provider">Proveedor del LLM</label>
+                  <select id="generator-provider"
+                    value={draft?.generator_provider ?? "openai_compatible"}
+                    onChange={(event) => {
+                      setDraft((current) => current ? {
+                        ...current,
+                        generator_provider: event.target.value as Connections["generator_provider"],
+                        vertex_project: current.vertex_project ?? "",
+                        vertex_location: current.vertex_location ?? "global",
+                      } : current);
+                      setChecks([]);
+                      setNotice("");
+                    }}>
+                    <option value="openai_compatible">OpenAI compatible (Ollama / llama.cpp)</option>
+                    <option value="vertex_ai">Gemini · Vertex AI (ADC)</option>
+                  </select>
+                </div>
+                {fields.filter((field) => {
+                  const vertex = draft?.generator_provider === "vertex_ai";
+                  if (field.key.startsWith("vertex_")) return vertex;
+                  return field.key !== "generator_url" || !vertex;
+                }).map((field) => (
                   <div key={field.key}>
                     <label htmlFor={field.key}>{field.label}</label>
                     <input
                       id={field.key}
                       type={field.type || "text"}
-                      required
+                      required={field.key !== "vertex_project"}
                       maxLength={2048}
                       min={field.type === "number" ? 1 : undefined}
                       max={field.type === "number" ? 180 : undefined}
@@ -256,8 +280,14 @@ export function RuntimeSettings() {
                   onChange={(event) => setReindex(event.target.checked)}
                 />
                 Entiendo que cambiar el modelo/proveedor de embeddings exige
-                otra colección compatible y reindexar fuera de la app.
+                otra colección compatible y reindexar desde Corpus / Crawler.
               </label>
+              <p className="help">
+                Vertex AI usa credenciales ADC del servidor. No introduzcas claves
+                de Google aquí. Elige un modelo Gemini disponible en tu proyecto
+                y autoriza el origen de su ubicación en el backend. Probar ADC no
+                verifica acceso al modelo, cuota ni una respuesta generada.
+              </p>
               <p className="help">
                 No cambies el modelo servido detrás de una URL de embeddings sin
                 tratarlo como un cambio de modelo. Probar conexión no valida la

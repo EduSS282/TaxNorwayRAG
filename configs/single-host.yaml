@@ -1,0 +1,20 @@
+# All endpoints are private Compose service names on the same host.
+corpus:
+  embedding_provider: ollama
+  embedding_model: qwen3-embedding:0.6b
+  embedding_base_url: http://ollama:11434
+  qdrant_url: http://qdrant:6333
+  qdrant_collection: taxguide_single_host_v1
+retrieval:
+  reranker_provider: http
+  reranker_model: Qwen/Qwen3-Reranker-0.6B
+  reranker_base_url: http://reranker:8001
+  reranker_timeout: 120.0
+generation:
+  provider: openai_compatible
+  base_url: http://ollama:11434
+  model: qwen3:4b-instruct-2507-q4_K_M
+  timeout: 180.0
+  # Used only when selecting Vertex AI; the local generator ignores this setting.
+  # Zero disables thinking on compatible Flash models. Use null for models that require thinking.
+  vertex_thinking_budget: 0

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CrawlState, crawlCommand, isCrawling } from "../lib/crawler";
+import { CorpusPreparation } from "./corpus-preparation";
 
 const states: Record<string, string> = {
   pending: "Pendiente",
@@ -130,8 +131,8 @@ export function CrawlerPanel() {
         en la máquina de la API, no en este navegador.
       </p>
       <p>
-        Descargado no significa completo ni indexado. Este panel no carga
-        modelos ni modifica Qdrant.
+        Descargado no significa completo ni indexado. La descarga no carga
+        modelos. El panel de preparación inferior permite indexar en Qdrant.
       </p>
       {!state ? (
         <form
@@ -386,23 +387,7 @@ export function CrawlerPanel() {
               )}
             </section>
           )}
-          <section className="panel">
-            <h2>Después: preparar el corpus</h2>
-            <p>
-              La indexación sigue siendo un paso separado por CLI. Ejecuta el
-              build con los mismos directorios del backend y los filtros de las
-              secciones deseadas. Necesita embeddings y Qdrant disponibles.
-            </p>
-            <p>Ejemplo para tarifas, desde la raíz del repositorio:</p>
-            <pre>
-              uv run taxguide corpus build --url-prefix "/en/rates/" --language
-              en --index
-            </pre>
-            <p className="help">
-              Los conteos de esta página no verifican la colección vectorial ni
-              la calidad de las respuestas.
-            </p>
-          </section>
+          <CorpusPreparation adminKey={key} />
         </>
       )}
       {busy && <p role="status">Consultando la API…</p>}

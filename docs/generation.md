@@ -4,7 +4,8 @@
 
 `taxguide answer` is the end-to-end grounded-generation entry point. It composes deterministic
 routing, tax-year resolution, retrieval, optional reranking, bounded evidence selection, an
-OpenAI-compatible generator, Pydantic parsing, grounding validation, and safe abstention.
+OpenAI-compatible or native Vertex AI Gemini generator, Pydantic parsing, grounding validation,
+and safe abstention.
 
 ```text
 question
@@ -42,6 +43,21 @@ generation:
 `structured_output: true` adds the OpenAI-compatible `response_format: {type: json_object}` request.
 The prompt also includes the complete `RagAnswer` JSON schema. The response still passes through
 Pydantic; server-side JSON mode is not trusted as validation.
+
+For Vertex AI, use `provider: vertex_ai` and a Gemini publisher model ID. Set `vertex_project`
+or infer it through server ADC, and choose `vertex_location` (`global` by default). The adapter
+uses native `generateContent`, `responseMimeType: application/json` when structured output is
+enabled, and lazy ADC token discovery/refresh. It never treats `base_url` as a cloud endpoint.
+`vertex_thinking_budget` is optional; `null` omits the setting, while zero is appropriate only for
+models supporting disabled thinking. Increase `max_tokens` as needed for models that consume
+output budget while thinking. See `configs/vertex.example.yaml` and
+[the deployment guide](single-host-deployment.md#gemini-through-vertex-ai).
+
+The Vertex adapter rejects non-`STOP` finishes, safety blocks, missing content and malformed
+responses before answer parsing. It omits thought text, does not follow redirects or retry model
+requests, and returns sanitized provider errors. No cloud credentials are accepted in query bodies
+or saved operator preferences. The implementation is text-only and non-streaming; a passing
+deterministic adapter test does not establish model access or fiscal quality.
 
 The model server is an external process. TaxGuide does not download weights, select a GGUF file,
 set the llama.cpp context window, start the process, or supervise it.

@@ -6,12 +6,22 @@ vienen de la API configurada; las fixtures solo se usan en pruebas.
 
 ## Arranque local
 
+Para la demo con imágenes publicadas, usa [el despliegue por imágenes](image-deployment.md):
+el artefacto de Actions incluye `compose.demo.yaml` y `.env.demo.example`. Tras configurar `.env`,
+ejecuta `docker compose pull` y `docker compose up -d --no-build`; no necesitas Node.js en la VM.
+La UI sigue siendo privada. Las pruebas deterministas de CI no sustituyen la evaluación con modelos reales.
+
+Para desplegar todo en una VM Linux con un solo comando, usa
+[el stack de un host](single-host-deployment.md): `.env` selecciona `compose.single-host.yaml` y
+`docker compose up --build -d` inicia contenedores, servicios y bootstrap de modelos. Los pasos
+de terminal separados siguientes siguen siendo una opción de desarrollo local.
+
 Requisitos: Python 3.12+, uv, Node.js 20.9+ (CI usa Node 24), npm y los servicios de
 [runtime local](local-runtime.md). Para una respuesta generada hacen falta corpus indexado,
 embeddings, Qdrant y generador. El modo reranked y la comparación requieren además reranker.
 
-1. Desde la raíz: `uv sync --locked`. Prepara los modelos y el corpus según el README; la UI no
-   descarga pesos ni indexa documentos.
+1. Desde la raíz: `uv sync --locked`. Instala los modelos según el README. La UI no descarga
+   pesos; permite descargar fuentes, construir el corpus e indexarlo desde `/crawler`.
 2. Terminal de API, desde la raíz:
 
    ```powershell
@@ -86,14 +96,23 @@ esté lista. No hay arranque automático al abrir el panel ni descarga de modelo
 pueden configurar y comprobar, pero su arranque sigue siendo manual. Los cambios del panel afectan
 solo a la API, no al YAML del CLI. El panel de administración está en español.
 
+El selector **Proveedor del LLM** permite mantener OpenAI compatible o usar **Gemini · Vertex AI
+(ADC)**. En Vertex se muestran proyecto y ubicación; la URL del LLM se sustituye por el origen
+Google derivado de la ubicación. La API exige ese origen en su allowlist. Las credenciales se
+provisionan en el servidor, nunca en el formulario. **Probar conexiones** comprueba ADC sin
+generar texto; no prueba permisos del modelo, cuota ni calidad. Cambiar solo el generador no
+requiere reindexar. Consulta [Gemini en un host](single-host-deployment.md#gemini-through-vertex-ai).
+
 ## Crawler y corpus
 
 El enlace **Corpus / Crawler** abre `/crawler`. Usa la misma clave de administración para ver
 capturas existentes y seleccionar fuentes del catálogo. Permite descargar varias secciones,
 seleccionar años de tarifas, limitar páginas/profundidad, consultar progreso y cancelar conservando
 archivos. No requiere modelos ni Qdrant. Las capturas se guardan donde corre Python.
-El panel distingue descarga de indexación: **no asegura cobertura completa ni consulta Qdrant**.
-El build/index sigue por CLI. Consulta [el manual del crawler web](crawler-ui.md) para arrancarlo,
+El inventario de descargas **no asegura cobertura completa ni consulta Qdrant**.
+El panel **Preparar corpus e indexar en Qdrant** permite revisar selección, construir e indexar
+usando las conexiones guardadas, con progreso, cancelación e informe descargable. No necesitas
+comandos para subir vectores. Consulta [el manual del crawler web](crawler-ui.md) para arrancarlo,
 entender los conteos y alinear directorios/conexiones. Reinicia una API antigua para habilitar la ruta.
 
 ## Inspector (#78)
@@ -115,6 +134,11 @@ se muestran por separado. No hay persistencia de trazas ni evaluación automáti
 
 ## Diagnóstico
 
+**Conectado · Falta preparar** (`needs_setup`) significa que el servicio responde pero falta su
+recurso: colección/corpus en Qdrant o modelo en Ollama. No equivale a `unavailable`. Tras un
+despliegue nuevo, espera los modelos y construye el índice desde `/crawler`; después actualiza
+los servicios. Un contenedor `Up` solo acredita que corre su proceso.
+
 | Síntoma | Comprobación |
 | --- | --- |
 | No abre 3000 | Proceso Node y puerto; usa la dirección loopback de la máquina o el túnel |
@@ -127,7 +151,7 @@ se muestran por separado. No hay persistencia de trazas ni evaluación automáti
 El proxy espera hasta 180 segundos y el navegador 190; un timeout no garantiza que se cancele
 el cómputo Python ya iniciado. Las solicitudes son sin caché, sin reintentos automáticos y no
 reenvían cookies ni cabeceras del navegador a la API, excepto `Authorization` exclusivamente para
-`/api/admin` y `/api/crawl`. Solo están permitidas query, retrieve, admin y crawl en el backend fijo. Se
+`/api/admin`, `/api/crawl` y `/api/corpus`. Solo están permitidas query, retrieve, admin, crawl y corpus en el backend fijo. Se
 rechazan peticiones con origen explícito distinto; esto no sustituye autenticación o protección
 de un despliegue público. No expongas estos servicios sin una pasarela autenticada.
 
@@ -165,3 +189,8 @@ El [despliegue Docker privado](production-readiness.md) compila la misma interfa
 proxy a la API por la red interna de Compose. No inicia modelos ni sustituye los benchmarks
 reales; los tests Playwright siguen usando un upstream determinista. La prueba de despliegue en
 CI verifica el proxy y una aclaración determinista, no inferencia con modelos.
+
+Las pruebas de preparación verifican selección, confirmación de escrituras, progreso, cancelación,
+descarga de informes, recuperación del trabajo activo, errores y aislamiento de credenciales.
+Usan respuestas controladas. Python verifica por separado parsing, chunking e indexación con
+Qdrant en memoria; ninguna de estas pruebas certifica los modelos reales ni un despliegue GCP.

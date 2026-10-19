@@ -8,7 +8,7 @@ export async function POST(
   context: { params: Promise<{ operation: string }> },
 ) {
   const { operation } = await context.params;
-  if (!["query", "retrieve", "admin", "crawl"].includes(operation)) {
+  if (!["query", "retrieve", "admin", "crawl", "corpus"].includes(operation)) {
     return NextResponse.json({ detail: "Unknown operation" }, { status: 404 });
   }
   const headers = { "Cache-Control": "no-store" };
@@ -59,7 +59,7 @@ export async function POST(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(["admin", "crawl"].includes(operation)
+        ...(["admin", "crawl", "corpus"].includes(operation)
           ? { Authorization: request.headers.get("authorization") || "" }
           : {}),
       },

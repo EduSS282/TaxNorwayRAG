@@ -35,6 +35,14 @@ servicios de confianza; los nombres DNS y su resolución también son responsabi
 Los modelos externos que requieren API keys siguen necesitando un adaptador/pasarela apropiado;
 la clave del panel no es una credencial para proveedores LLM.
 
+La excepción implementada es **Gemini · Vertex AI (ADC)**: la API obtiene y renueva credenciales
+ADC del servidor. En `/settings` elige proveedor, modelo Gemini, proyecto (vacío usa ADC) y ubicación.
+Los campos nuevos del contrato son `generator_provider`, `vertex_project` y `vertex_location`.
+El origen Google se deriva de la ubicación y debe estar autorizado; en Vertex no se usa la URL
+local del LLM. La comprobación valida ADC, sin inferencia ni garantía de permisos/cuota del modelo.
+No se puede iniciar o detener Gemini desde el gestor local. Las preferencias antiguas conservan
+OpenAI compatible por defecto. Consulta [el despliegue de un host](single-host-deployment.md).
+
 ## 2. Preparar perfiles locales una sola vez
 
 Para editar conexiones no necesitas perfiles. Para habilitar **Iniciar**, copia
@@ -105,12 +113,14 @@ Antes de guardar/restaurar, detén los servicios que TaxGuide posea, para no dej
 gestionado apuntando a una configuración distinta.
 
 Cambiar el modelo o proveedor de embeddings exige **otro nombre de colección** y marcar la
-confirmación de reindexación. No se borra ni reindexa nada desde la app. Prepara la nueva colección
-con el modelo correcto antes de consultar; para volver a la anterior se pide la misma confirmación.
+confirmación de reindexación. Guardar conexiones no reindexa: abre `/crawler`, revisa la selección
+y usa **Construir e indexar** para preparar esa colección con las conexiones guardadas. No se borra
+la colección anterior. Para volver a la anterior se pide la misma confirmación.
 Cambiar solo una URL no prueba que el modelo remoto sea idéntico. Si cambian los pesos/revisión
 servidos tras una URL o alias, debes tratarlo como cambio de modelo y crear un índice compatible.
 
-Estas preferencias afectan a la **API**, no a la CLI. Para construir/reindexar con `taxguide corpus`
+La preparación web usa estas preferencias de la **API**. No cambian la CLI. Si eliges
+construir/reindexar con `taxguide corpus`
 prepara también un overlay YAML equivalente y usa `--overlay`; la CLI no lee automáticamente el
 JSON de conexiones. Si desactivas administración, la API vuelve al YAML base/overlay y no carga
 ese JSON. Al reactivarla vuelve a cargar el estado guardado; si contiene un destino retirado de la
@@ -135,6 +145,7 @@ evidencia de que el sistema puede contestar.
 | Estado | Significado |
 | --- | --- |
 | `available` | Pasó la comprobación limitada descrita debajo |
+| `needs_setup` | Servicio accesible; falta colección, puntos o modelo. La UI muestra «Conectado · Falta preparar» |
 | `starting` | Proceso propio vivo, pero todavía no pasa la comprobación; puede requerir corregir modelo/corpus |
 | `external` | Puerto ocupado por un servicio no iniciado por TaxGuide; su disponibilidad se informa por separado |
 | `in_process` | Adaptador Python local; no tiene botón de proceso externo ni se valida cargando pesos |
@@ -144,6 +155,13 @@ evidencia de que el sistema puede contestar.
 Las comprobaciones leen: `/v1/models` y alias del generador; `/api/tags` y modelo instalado para
 Ollama; `/health` para reranker; colección Qdrant verde y con puntos. No prueban inferencia,
 dimensiones de embeddings, fidelidad fiscal ni compatibilidad completa del reranker.
+
+Qdrant sin colección es un estado de preparación, no un fallo de red. La comprobación lee primero
+el catálogo de colecciones y distingue colección ausente/vacía de servidor inaccesible. Construye
+e indexa desde `/crawler`. Preparar servicios puede continuar hasta embeddings cuando Qdrant es
+accesible aunque todavía no tenga corpus; las consultas siguen requiriendo evidencia indexada.
+Ollama accesible sin modelos, incluido su catálogo OpenAI con `data: null`, también indica
+`needs_setup`. En el stack completo espera al trabajo `models-init`.
 
 Solo pueden arrancarse URLs HTTP de loopback (`127.0.0.1`, `localhost`, `::1`). Direcciones remotas
 se prueban/usan, pero sus procesos deben arrancarse allí manualmente. Los proveedores Python
@@ -169,7 +187,7 @@ un fallo nativo detallado, ejecuta manualmente el servicio en una terminal fuera
 
 ## Seguridad y verificación
 
-La clave solo protege `/v1/admin`; los endpoints de consulta existentes siguen sin autenticación.
+La clave protege `/v1/admin`, `/v1/crawl` y `/v1/corpus`; los endpoints de consulta existentes siguen sin autenticación.
 Mantén ambos servidores en loopback o tras túnel/gateway privado con TLS donde corresponda. El
 proxy verifica origen y solo reenvía `Authorization` hacia administración; la API rechaza llamadas
 de navegador directas con `Origin`. No hay cuentas, auditoría persistente, rate limiting ni control

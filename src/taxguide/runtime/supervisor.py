@@ -47,6 +47,8 @@ class Supervisor:
             return any(self._owned(service) for service in list(self.handles))
 
     def can_start(self, service: ServiceName, connections: Connections) -> bool:
+        if service == "generator" and connections.generator_provider == "vertex_ai":
+            return False
         if service not in self.profiles.services or not local_endpoint(connections.url(service)):
             return False
         return not (
