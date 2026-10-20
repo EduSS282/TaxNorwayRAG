@@ -86,6 +86,26 @@ def test_global_adc_project_and_thought_parts_are_not_exposed():
     )
 
 
+@pytest.mark.parametrize("location", ["eu", "us"])
+def test_multiregion_uses_jurisdiction_endpoint_without_global_fallback(location):
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        assert request.url.host == f"aiplatform.{location}.rep.googleapis.com"
+        assert f"/projects/adc-project/locations/{location}/" in request.url.path
+        assert "thinkingConfig" not in json.loads(request.content)["generationConfig"]
+        return httpx.Response(200, json=completion())
+
+    assert (
+        generator(respond, location=location).generate(
+            [{"role": "user", "content": "Q"}], temperature=0.1, max_tokens=4096
+        )
+        == "{}"
+    )
+    assert len(requests) == 1
+
+
 @pytest.mark.parametrize(
     "payload",
     [

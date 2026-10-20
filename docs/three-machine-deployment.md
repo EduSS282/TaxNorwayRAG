@@ -1,5 +1,10 @@
 # Ejecución distribuida en sobremesa, portátil y Oracle Free Tier
 
+La VM GCP de Fieldmind tiene [una carpeta independiente](../deployments/fieldmind-gcp/README.md)
+con imágenes publicadas, acceso IAP al puerto 8080 y Gemini en `eu`. No utiliza el despliegue
+distribuido siguiente. Su guía incluye SSH, copia del paquete y apertura del túnel del navegador;
+las pruebas deterministas no demuestran acceso al proyecto ni calidad de modelos reales.
+
 La demo en una sola VM también dispone de [despliegue con imágenes publicadas](image-deployment.md).
 Con el artefacto de Actions y `.env` configurado: `docker compose pull` y
 `docker compose up -d --no-build`. Usa `compose.demo.yaml`, mantiene los volúmenes del stack de

@@ -1,5 +1,8 @@
 # One-machine Linux deployment
 
+The provisioned Fieldmind VM has [a separate folder](../deployments/fieldmind-gcp/README.md) for
+IAP port 8080 and Vertex in `eu`. Use that runbook for its specific connection/startup commands.
+
 For the Fieldmind demo, prefer the [published-image deployment](image-deployment.md):
 `compose.demo.yaml` runs this same stack using downloaded SHA-tagged images. It needs no source
 checkout or builds on the VM. The instructions below retain the source-build option.
@@ -103,6 +106,10 @@ In `/settings`:
    `https://aiplatform.googleapis.com`; regional requests use
    `https://LOCATION-aiplatform.googleapis.com`. Add any regional origin to
    `TAXGUIDE_SERVICE_ORIGINS` in `.env` and recreate the API before selecting it.
+
+   For multi-region `eu` or `us`, use `https://aiplatform.LOCATION.rep.googleapis.com` instead.
+   The location stays `eu`/`us` in the request path. Authorize that exact origin; there is no
+   fallback to global. The Fieldmind folder already selects and authorizes `eu`.
 5. Save and apply. Test connections. The Vertex check obtains ADC credentials; it does not
    generate content or establish model permissions/quota. A real grounded question is still required.
 6. Ask a corpus-supported question through `/`, then inspect answer status and citations.

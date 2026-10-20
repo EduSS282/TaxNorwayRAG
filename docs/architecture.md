@@ -45,6 +45,13 @@ the browser or saved connections. Pydantic and citation/year validation remain d
 generation providers. Gemini embeddings and managed Vertex retrieval are not included. See
 [ADR 0018](adr/0018-single-host-compose-and-vertex.md).
 
+The dedicated `deployments/fieldmind-gcp/` boundary uses its own Compose project and persistent
+volumes. It publishes only frontend port 8080 for the administrator-provisioned IAP firewall,
+uses the attached VM identity, and selects Gemini in `eu` from startup. `vertex_origin` maps
+`eu`/`us` to their jurisdictional `aiplatform.LOCATION.rep.googleapis.com` hosts; regional and
+global mappings are retained without cross-location fallback. See
+[ADR 0020](adr/0020-fieldmind-iap-eu.md) and the [runbook](../deployments/fieldmind-gcp/README.md).
+
 The current CLI boundary includes grounded generation:
 
 ```text

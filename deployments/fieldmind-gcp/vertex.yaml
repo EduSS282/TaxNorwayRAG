@@ -1,0 +1,23 @@
+# VM region is europe-north1; Gemini must use the distinct EU multi-region endpoint.
+project:
+  environment: fieldmind-demo
+corpus:
+  embedding_provider: ollama
+  embedding_model: qwen3-embedding:0.6b
+  embedding_base_url: http://ollama:11434
+  qdrant_url: http://qdrant:6333
+  qdrant_collection: taxnorge_fieldmind_v1
+retrieval:
+  reranker_provider: http
+  reranker_model: Qwen/Qwen3-Reranker-0.6B
+  reranker_base_url: http://reranker:8001
+  reranker_timeout: 120.0
+generation:
+  provider: vertex_ai
+  base_url: https://aiplatform.eu.rep.googleapis.com
+  model: gemini-3.5-flash
+  vertex_project: eduardo-taxnorge
+  vertex_location: eu
+  vertex_thinking_budget: null
+  max_tokens: 4096
+  timeout: 180.0
