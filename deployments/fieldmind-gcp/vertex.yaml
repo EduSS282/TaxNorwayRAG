@@ -19,5 +19,7 @@ generation:
   vertex_project: eduardo-taxnorge
   vertex_location: eu
   vertex_thinking_budget: null
-  max_tokens: 4096
+  vertex_thinking_level: LOW
+  # Thinking and the final citation JSON share this output allowance.
+  max_tokens: 8192
   timeout: 180.0

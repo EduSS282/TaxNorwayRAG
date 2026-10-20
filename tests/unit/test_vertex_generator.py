@@ -86,6 +86,31 @@ def test_global_adc_project_and_thought_parts_are_not_exposed():
     )
 
 
+@pytest.mark.parametrize("level", ["MINIMAL", "LOW", "MEDIUM", "HIGH"])
+def test_native_thinking_level_is_explicit_and_excludes_numeric_budget(level):
+    def respond(request):
+        assert json.loads(request.content)["generationConfig"]["thinkingConfig"] == {
+            "thinkingLevel": level
+        }
+        return httpx.Response(200, json=completion())
+
+    assert (
+        generator(respond, thinking_level=level).generate(
+            [{"role": "user", "content": "Q"}], temperature=0.1, max_tokens=8192
+        )
+        == "{}"
+    )
+
+
+def test_thinking_level_and_budget_are_mutually_exclusive():
+    with pytest.raises(ValueError, match="not both"):
+        generator(lambda _: httpx.Response(200), thinking_level="LOW", thinking_budget=1024)
+    with pytest.raises(ValueError, match="not both"):
+        GenerationConfig(vertex_thinking_level="LOW", vertex_thinking_budget=1024)
+    with pytest.raises(ValueError, match="thinking level"):
+        generator(lambda _: httpx.Response(200), thinking_level="invalid")
+
+
 @pytest.mark.parametrize("location", ["eu", "us"])
 def test_multiregion_uses_jurisdiction_endpoint_without_global_fallback(location):
     requests = []

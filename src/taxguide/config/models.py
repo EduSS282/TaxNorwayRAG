@@ -84,9 +84,12 @@ class GenerationConfig(ConfigModel):
     vertex_project: str = Field(default="", max_length=63, pattern=r"^[a-zA-Z0-9-]*$")
     vertex_location: str = Field(default="global", max_length=63, pattern=r"^[a-z][a-z0-9-]*$")
     vertex_thinking_budget: int | None = Field(default=None, ge=-1)
+    vertex_thinking_level: Literal["MINIMAL", "LOW", "MEDIUM", "HIGH"] | None = None
 
     @model_validator(mode="after")
     def validate_vertex_model(self) -> "GenerationConfig":
+        if self.vertex_thinking_budget is not None and self.vertex_thinking_level is not None:
+            raise ValueError("Configure a Vertex thinking budget or level, not both")
         if self.provider == "vertex_ai":
             import re
 

@@ -31,7 +31,7 @@ def test_fieldmind_stack_only_publishes_iap_port_and_never_builds_or_downloads_l
     assert set(compose["volumes"]) == {"vectors", "app-data", "ollama-models", "reranker-models"}
 
 
-def test_fieldmind_yaml_factory_and_runtime_agree_on_eu_origin_and_omit_unsupported_thinking(
+def test_fieldmind_yaml_factory_and_runtime_agree_on_eu_origin_and_thinking_level(
     monkeypatch,
 ):
     config = load_config(Path("configs/base.yaml"), DEPLOYMENT / "vertex.yaml")
@@ -56,8 +56,8 @@ def test_fieldmind_yaml_factory_and_runtime_agree_on_eu_origin_and_omit_unsuppor
             "publishers/google/models/gemini-3.5-flash:generateContent"
         )
         generation = json.loads(request.content)["generationConfig"]
-        assert "thinkingConfig" not in generation
-        assert generation["maxOutputTokens"] == 4096
+        assert generation["thinkingConfig"] == {"thinkingLevel": "LOW"}
+        assert generation["maxOutputTokens"] == 8192
         return httpx.Response(
             200,
             json={"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "{}"}]}}]},

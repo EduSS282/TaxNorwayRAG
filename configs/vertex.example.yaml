@@ -5,6 +5,8 @@ generation:
   vertex_project: ""  # Inferred from server ADC / GOOGLE_CLOUD_PROJECT when empty.
   vertex_location: global
   vertex_thinking_budget: 0  # Compatible Flash models only; use null otherwise.
+  # Gemini 3: set budget to null and vertex_thinking_level to LOW instead.
+  vertex_thinking_level: null
   timeout: 180.0
   structured_output: true
   max_tokens: 4096

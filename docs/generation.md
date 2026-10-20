@@ -43,6 +43,9 @@ generation:
 `structured_output: true` adds the OpenAI-compatible `response_format: {type: json_object}` request.
 The prompt also includes the complete `RagAnswer` JSON schema. The response still passes through
 Pydantic; server-side JSON mode is not trusted as validation.
+Generated citations are instructed to leave optional `quote_span` values null: character offsets
+are not supplied and guessing them caused valid-source answers to fail validation. Any offsets
+returned despite that instruction still pass through the existing strict span validator.
 
 For Vertex AI, use `provider: vertex_ai` and a Gemini publisher model ID. Set `vertex_project`
 or infer it through server ADC, and choose `vertex_location` (`global` by default). The adapter
@@ -52,6 +55,15 @@ enabled, and lazy ADC token discovery/refresh. It never treats `base_url` as a c
 models supporting disabled thinking. Increase `max_tokens` as needed for models that consume
 output budget while thinking. See `configs/vertex.example.yaml` and
 [the deployment guide](single-host-deployment.md#gemini-through-vertex-ai).
+
+For Gemini 3, `vertex_thinking_level` accepts `MINIMAL`, `LOW`, `MEDIUM`, or `HIGH`.
+It is mutually exclusive with `vertex_thinking_budget`; omitted settings retain provider defaults.
+The Fieldmind overlay uses `LOW` with 8192 output tokens. A live childcare query exhausted the former
+4096-token allowance with 3930 thinking tokens and 151 answer tokens (`MAX_TOKENS`), despite
+successful retrieval and an HTTP 200 provider response. Incomplete output remains rejected;
+the explicit reasoning level and larger allowance provide room for the final citation JSON rather than
+accepting truncated answers. It is a ceiling, not a guaranteed output size or completion.
+Increasing the allowance alone still produced an intermittent 503 during repeat testing.
 
 The Vertex adapter rejects non-`STOP` finishes, safety blocks, missing content and malformed
 responses before answer parsing. It omits thought text, does not follow redirects or retry model
