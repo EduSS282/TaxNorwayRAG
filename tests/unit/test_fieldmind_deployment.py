@@ -57,7 +57,7 @@ def test_fieldmind_yaml_factory_and_runtime_agree_on_eu_origin_and_omit_unsuppor
         )
         generation = json.loads(request.content)["generationConfig"]
         assert "thinkingConfig" not in generation
-        assert generation["maxOutputTokens"] == 4096
+        assert generation["maxOutputTokens"] == 8192
         return httpx.Response(
             200,
             json={"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "{}"}]}}]},

@@ -53,6 +53,12 @@ models supporting disabled thinking. Increase `max_tokens` as needed for models 
 output budget while thinking. See `configs/vertex.example.yaml` and
 [the deployment guide](single-host-deployment.md#gemini-through-vertex-ai).
 
+The Fieldmind overlay allows 8192 output tokens. A live childcare query exhausted the former
+4096-token allowance with 3930 thinking tokens and 151 answer tokens (`MAX_TOKENS`), despite
+successful retrieval and an HTTP 200 provider response. Incomplete output remains rejected;
+the larger allowance provides room for reasoning plus the final citation JSON rather than
+accepting truncated answers. It is a ceiling, not a guaranteed output size or completion.
+
 The Vertex adapter rejects non-`STOP` finishes, safety blocks, missing content and malformed
 responses before answer parsing. It omits thought text, does not follow redirects or retry model
 requests, and returns sanitized provider errors. No cloud credentials are accepted in query bodies
