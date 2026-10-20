@@ -43,6 +43,9 @@ generation:
 `structured_output: true` adds the OpenAI-compatible `response_format: {type: json_object}` request.
 The prompt also includes the complete `RagAnswer` JSON schema. The response still passes through
 Pydantic; server-side JSON mode is not trusted as validation.
+Generated citations are instructed to leave optional `quote_span` values null: character offsets
+are not supplied and guessing them caused valid-source answers to fail validation. Any offsets
+returned despite that instruction still pass through the existing strict span validator.
 
 For Vertex AI, use `provider: vertex_ai` and a Gemini publisher model ID. Set `vertex_project`
 or infer it through server ADC, and choose `vertex_location` (`global` by default). The adapter
