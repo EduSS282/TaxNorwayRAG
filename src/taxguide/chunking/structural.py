@@ -1,8 +1,11 @@
 """Section-aware chunking that retains the normalized heading hierarchy."""
 
+from urllib.parse import urlsplit
+
 from taxguide.chunking._chunks import build_chunks
 from taxguide.chunking.tokenizer import Tokenizer, WhitespaceTokenizer
 from taxguide.domain.models import Chunk, Document, Paragraph, Section
+from taxguide.ingestion.skatteetaten_years import tax_year_from_url
 
 
 class StructuralChunker:
@@ -17,6 +20,29 @@ class StructuralChunker:
         self.tokenizer = tokenizer or WhitespaceTokenizer()
 
     def chunk(self, document: Document) -> list[Chunk]:
+        # Short annual rates need their labels and amounts in the same evidence unit.
+        # Otherwise a generic table such as "Upper limit" loses its subject at retrieval.
+        if (
+            document.tax_year is not None
+            and tax_year_from_url(document.source_url) == document.tax_year
+            and document.source_domain in {"skatteetaten.no", "www.skatteetaten.no"}
+            and urlsplit(document.source_url).path.startswith(
+                ("/en/rates/", "/satser/", "/nn/satser/")
+            )
+        ):
+            rate_text = "\n\n".join(
+                text
+                for section in document.sections
+                for text in [section.heading or "", *(p.text for p in section.paragraphs)]
+                if text.strip()
+            )
+            if rate_text and len(self.tokenizer.tokenize(rate_text)) <= self.max_tokens:
+                return build_chunks(
+                    document=document,
+                    texts=[rate_text],
+                    section_paths=[(document.title,) if document.title else ()],
+                    tokenizer=self.tokenizer,
+                )
         texts: list[str] = []
         paths: list[tuple[str, ...]] = []
         headings: list[tuple[int, str]] = []

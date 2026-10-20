@@ -58,7 +58,7 @@ Start with [installation](#installation), [local workflow](#local-workflow), and
 - domain/path-constrained crawling with robots and bounded `Retry-After` handling, plus source
   change detection across recrawls;
 - HTML parsing, normalization, and deterministic document/version identities;
-- fixed-token, recursive, and structural chunking;
+- fixed-token, recursive, and structural chunking, keeping short verified annual rates together;
 - Ollama and local `sentence-transformers` embedding adapters;
 - Qdrant indexing and dense retrieval;
 - in-memory BM25 sparse retrieval, reciprocal-rank fusion, and Qwen reranking;

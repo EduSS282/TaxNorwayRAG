@@ -111,6 +111,11 @@ Before `answered`, the service verifies:
 An invalid citation, year, or quote span produces canonical abstention. Malformed structured output
 is an operational failure rather than an attempt to salvage untrusted prose.
 
+A structured response with no citations, low confidence and explicit missing information
+is treated as a model abstention after validating the requested year. The service returns
+canonical abstention prose and preserves the missing information; it never exposes uncited
+generated tax claims. A missing citation without these signals remains a validation failure.
+
 Evidence is labelled as untrusted source content in both system and user messages. The model is
 instructed never to follow commands embedded in retrieved text. This reduces prompt-injection risk
 but is not treated as a security boundary; deterministic output validation remains authoritative.

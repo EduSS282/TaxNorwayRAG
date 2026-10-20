@@ -1,5 +1,12 @@
 # Corpus batch workflow
 
+Structural chunking keeps a verified annual Skatteetaten rate page in one chunk when
+its headings and paragraphs together fit the configured token budget. This keeps
+short tables with their subject instead of embedding an isolated "Upper limit".
+Long rate pages retain section-based splitting. After updating the application,
+rebuild and index with prefix `/en/rates/` to update affected chunks incrementally;
+existing captures can be reused, and other sections need not be reindexed.
+
 The corpus command selects crawler artifacts from JSON crawl manifests, never from
 HTML filenames. Its flow is:
 

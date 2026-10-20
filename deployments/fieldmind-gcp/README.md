@@ -126,6 +126,23 @@ siendo responsabilidad del proyecto GCP; el paquete no certifica por sí mismo r
 
 ## Actualizar, detener y resolver problemas
 
+Si hay un `compose.override.yaml` con una imagen correctiva local de la API, ese archivo
+tiene prioridad sobre la etiqueta de `.env`. Conserva el correctivo hasta que la versión
+publicada incluya el cambio. Para volver a la imagen de `.env`, guarda el override con otro
+nombre y recrea únicamente la API:
+
+```bash
+mv compose.override.yaml compose.override.yaml.disabled
+sudo docker compose up -d --no-deps --wait api
+```
+
+Tras actualizar el chunking de rates, reutiliza las descargas y ejecuta la preparación con
+prefijo `/en/rates/`, límite suficiente y escritura en la colección existente. Al terminar,
+recrea la API si ya habías usado búsqueda híbrida: su índice BM25 se carga en memoria.
+El reranker local usa CPU; un HTTP 503 también puede ser un timeout de ese servicio, antes
+de llamar a Gemini. La presencia de datos indexados no garantiza que dense seleccione todos
+los fragmentos relevantes ni que el reranker termine dentro del tiempo configurado.
+
 Para actualizar imágenes, elige una versión publicada en `.env` y repite `pull` y
 `up -d --no-build`. No necesitas compilar ni borrar los volúmenes. `sudo docker compose stop`
 detiene la aplicación y conserva los datos; no detiene ni elimina la VM ni su disco. Coordina
