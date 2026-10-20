@@ -23,5 +23,6 @@ def create_generator(settings: GenerationConfig) -> Generator:
             timeout=settings.timeout,
             structured_output=settings.structured_output,
             thinking_budget=settings.vertex_thinking_budget,
+            thinking_level=settings.vertex_thinking_level,
         )
     raise ValueError(f"Unsupported generation provider: {settings.provider}")

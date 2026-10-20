@@ -117,10 +117,13 @@ La API usa ADC de `taxnorge-vm@eduardo-taxnorge.iam.gserviceaccount.com` a trav�
 metadatos. Su origen autorizado para generación es **`https://aiplatform.eu.rep.googleapis.com`**;
 no se configura fallback a `global`. Las variables del SDK `google-genai` no son necesarias: el
 proyecto usa su adaptador REST nativo. El presupuesto de thinking queda sin especificar para no
-enviar un `thinkingBudget: 0` incompatible; el máximo de salida es 8192 tokens, compartido
+enviar un `thinkingBudget: 0` incompatible. Se configura `vertex_thinking_level: LOW` y un
+máximo de salida de 8192 tokens, compartido
 entre razonamiento y respuesta final. Con 4096 se observó `MAX_TOKENS` y JSON truncado en
 preguntas de childcare, aunque el retrieval hubiera terminado correctamente. La API rechaza
-salidas incompletas y devuelve 503. Cambiar este límite en `vertex.yaml` solo requiere
+salidas incompletas y devuelve 503. Aumentar el límite a 8192 sin controlar el razonamiento
+no bastó en las pruebas repetidas. El nivel se envía como `thinkingConfig.thinkingLevel`,
+sin combinarlo con un presupuesto numérico. Cambiar estos ajustes en `vertex.yaml` requiere
 reiniciar la API; no requiere descargar documentos, reindexar ni recompilar imágenes.
 El nuevo límite aporta margen, pero no garantiza que todas las preguntas terminen dentro
 del presupuesto o del timeout. Un 503 de generación y uno del reranker requieren diagnósticos distintos.

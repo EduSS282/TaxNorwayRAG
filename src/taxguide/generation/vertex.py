@@ -78,6 +78,7 @@ class VertexAIGenerator:
         timeout: float = 180.0,
         structured_output: bool = True,
         thinking_budget: int | None = None,
+        thinking_level: str | None = None,
         token_source: Callable[[], VertexAccess] | None = None,
         client: httpx.Client | None = None,
     ) -> None:
@@ -93,6 +94,16 @@ class VertexAIGenerator:
         self._model_id = model_id
         self._structured = structured_output
         self._thinking_budget = thinking_budget
+        if thinking_level is not None and thinking_level not in {
+            "MINIMAL",
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+        }:
+            raise ValueError("Invalid Vertex AI thinking level")
+        if thinking_level is not None and thinking_budget is not None:
+            raise ValueError("Configure a Vertex thinking budget or level, not both")
+        self._thinking_level = thinking_level
         self._tokens = token_source or ADCTokenSource(min(timeout, 30.0))
         self._client = client or httpx.Client(timeout=timeout, follow_redirects=False)
 
@@ -134,6 +145,10 @@ class VertexAIGenerator:
         if self._thinking_budget is not None:
             payload["generationConfig"]["thinkingConfig"] = {
                 "thinkingBudget": self._thinking_budget,
+            }
+        if self._thinking_level is not None:
+            payload["generationConfig"]["thinkingConfig"] = {
+                "thinkingLevel": self._thinking_level,
             }
         headers = {"Authorization": f"Bearer {access.token}"}
         if access.quota_project:
