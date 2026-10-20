@@ -13,7 +13,7 @@ from taxguide.domain.models import DomainModel
 from taxguide.generation.abstention import AbstentionPolicy
 from taxguide.generation.base import Generator
 from taxguide.generation.language import ResponseLanguage
-from taxguide.generation.models import RagAnswer
+from taxguide.generation.models import ConfidenceLevel, RagAnswer
 from taxguide.generation.prompt_safety import exclude_instructional_evidence
 from taxguide.generation.prompts import build_grounded_messages
 from taxguide.generation.validation import CitationValidationError, CitationValidator
@@ -209,10 +209,16 @@ class GroundedRagService:
                 final_context=exposed_context,
             )
 
+        model_abstained = (
+            not answer.citations
+            and answer.confidence is ConfidenceLevel.LOW
+            and bool(answer.missing_information)
+        )
         try:
             self._citation_validator.validate(
                 answer,
                 context,
+                is_abstention=model_abstained,
                 expected_tax_year=resolved_year,
             )
         except CitationValidationError:
@@ -220,6 +226,18 @@ class GroundedRagService:
             return GroundedRagResult(
                 status=GroundedRagStatus.ABSTAINED,
                 answer=safe_answer,
+                routing=decision,
+                evidence_count=len(context.evidence),
+                generator_model=self._generator.model_id,
+                final_context=exposed_context,
+            )
+
+        if model_abstained:
+            return GroundedRagResult(
+                status=GroundedRagStatus.ABSTAINED,
+                answer=policy.abstain(
+                    tax_year=resolved_year, missing_information=answer.missing_information
+                ),
                 routing=decision,
                 evidence_count=len(context.evidence),
                 generator_model=self._generator.model_id,

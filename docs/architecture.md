@@ -141,6 +141,11 @@ Skatteetaten URL
   → QdrantVectorStore
 ```
 
+Short verified annual rate pages are kept together by the structural chunker when they fit
+the token budget, so a table retains its subject during retrieval. Longer pages keep section paths.
+Structured model abstentions preserve missing-information reasons but use canonical safe prose;
+uncited generated claims are not returned as answers.
+
 The crawler is bounded by host/path allowlists, named source policies, robots rules checked before
 each content redirect hop, depth, page count, response size, retry policy, and delay. Named source
 policies are input YAML; raw HTML and per-page capture manifests are stored separately. Corpus selection uses

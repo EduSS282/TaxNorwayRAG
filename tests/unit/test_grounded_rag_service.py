@@ -393,6 +393,33 @@ def test_service_returns_failed_for_retrieval_and_generation_failures() -> None:
     assert generation_failure.error == "generation failed: model unavailable"
 
 
+@pytest.mark.parametrize("answer_year", [2026, 2025])
+def test_service_preserves_missing_information_for_model_abstention(answer_year: int) -> None:
+    chunk = _chunk("a", tax_year=2026)
+    answer = _answer(chunk, tax_year=2026).model_copy(
+        update={
+            "answer": "Unverified prose must not be displayed.",
+            "citations": [],
+            "confidence": ConfidenceLevel.LOW,
+            "missing_information": ["The annual upper limit is absent."],
+            "tax_year": answer_year,
+        }
+    )
+    result = _service(
+        RecordingRetriever([ScoredChunk(chunk=chunk, score=1.0)]),
+        StubGenerator(answer.model_dump_json()),
+    ).answer("Explain Norwegian wealth tax for 2026.")
+    assert result.status is GroundedRagStatus.ABSTAINED
+    assert result.answer is not None
+    assert result.answer.missing_information == (
+        answer.missing_information
+        if answer_year == 2026
+        else ["Generated citations could not be validated."]
+    )
+    assert result.answer.citations == []
+    assert "Unverified prose" not in result.answer.answer
+
+
 def test_service_returns_failed_for_malformed_structured_output() -> None:
     chunk = _chunk("a", tax_year=2026)
 
