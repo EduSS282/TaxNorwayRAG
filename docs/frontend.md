@@ -6,6 +6,11 @@ vienen de la API configurada; las fixtures solo se usan en pruebas.
 
 ## Arranque local
 
+En la VM privada de Fieldmind, usa [su carpeta de despliegue](../deployments/fieldmind-gcp/README.md).
+Publica `8080:3000` para IAP y accede desde el ordenador con `gcloud compute start-iap-tunnel`
+al puerto 8080. Este listener depende del firewall privado de GCP; no reemplaza al arranque local
+en loopback. Las pruebas de empaquetado no verifican IAM ni generación real con Gemini.
+
 Para la demo con imágenes publicadas, usa [el despliegue por imágenes](image-deployment.md):
 el artefacto de Actions incluye `compose.demo.yaml` y `.env.demo.example`. Tras configurar `.env`,
 ejecuta `docker compose pull` y `docker compose up -d --no-build`; no necesitas Node.js en la VM.

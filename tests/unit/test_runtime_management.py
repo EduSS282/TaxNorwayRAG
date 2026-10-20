@@ -138,12 +138,13 @@ def test_vertex_settings_round_trip_and_remote_generator_never_launches(control,
     assert control.snapshot()[0].generation.provider == "openai_compatible"
 
 
-def test_vertex_origin_allowlist_blocks_region_changes_before_adc_discovery(control):
+@pytest.mark.parametrize("location", ["europe-west4", "eu", "us", "global"])
+def test_vertex_origin_allowlist_blocks_region_changes_before_adc_discovery(control, location):
     draft = control.state.current.model_copy(
         update={
             "generator_provider": "vertex_ai",
             "generator_model": "gemini-2.5-flash",
-            "vertex_location": "europe-west4",
+            "vertex_location": location,
         }
     )
     with pytest.raises(ValueError, match="Destination not authorized"):

@@ -4,6 +4,12 @@ This checklist answers Pierre's request for the environment needed to host TaxGu
 (TaxNorge), inspect its data pipeline, and discuss its technical choices. It describes a private
 technical demonstration, not a production release or a deployment already created in GCP.
 
+Pierre's provisioned private VM now has a dedicated deployment folder and connection runbook:
+[`deployments/fieldmind-gcp/`](../deployments/fieldmind-gcp/README.md). It targets the supplied
+4 vCPU / 16 GB / 50 GB host, Docker's `/data/docker` data-root, IAP port 8080 and native Vertex
+generation in `eu`. These are provided environment details, not proof of deployment or live
+model readiness; the earlier resource estimates below describe alternatives.
+
 For the demo, the [published-image path](image-deployment.md) uses `compose.demo.yaml` and
 `docker compose pull` followed by `docker compose up -d --no-build`. The deployment artifact
 pins all three application images to the same successful `main` commit. Docker Hub publication

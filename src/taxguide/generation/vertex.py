@@ -15,11 +15,12 @@ from taxguide.generation.openai_compatible import GenerationError
 def vertex_origin(location: str) -> str:
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,62}", location):
         raise ValueError("Invalid Vertex AI location")
-    host = (
-        "aiplatform.googleapis.com"
-        if location == "global"
-        else (f"{location}-aiplatform.googleapis.com")
-    )
+    if location == "global":
+        host = "aiplatform.googleapis.com"
+    elif location in {"eu", "us"}:
+        host = f"aiplatform.{location}.rep.googleapis.com"
+    else:
+        host = f"{location}-aiplatform.googleapis.com"
     return f"https://{host}"
 
 

@@ -24,6 +24,9 @@ jobs:
           TAXGUIDE_ADMIN_TOKEN: ci-config-validation-only-no-cloud-credentials
           TAXGUIDE_IMAGE_NAMESPACE: eduss28
           TAXGUIDE_IMAGE_TAG: sha-${{ github.sha }}
+      - run: docker compose --env-file deployments/fieldmind-gcp/.env.example -f deployments/fieldmind-gcp/compose.yaml config --quiet
+        env:
+          TAXGUIDE_ADMIN_TOKEN: ci-config-validation-only-no-cloud-credentials
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -107,3 +110,15 @@ jobs:
           name: taxguide-demo-sha-${{ github.sha }}
           path: dist/demo/
           include-hidden-files: true
+      - name: Prepare Fieldmind IAP deployment
+        env:
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          mkdir -p dist/fieldmind-gcp
+          cp deployments/fieldmind-gcp/compose.yaml deployments/fieldmind-gcp/vertex.yaml deployments/fieldmind-gcp/README.md dist/fieldmind-gcp/
+          sed "s/^TAXGUIDE_IMAGE_TAG=.*/TAXGUIDE_IMAGE_TAG=${IMAGE_TAG}/" deployments/fieldmind-gcp/.env.example > dist/fieldmind-gcp/.env.example
+          tar -czf dist/fieldmind-gcp.tar.gz -C dist fieldmind-gcp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taxnorge-fieldmind-sha-${{ github.sha }}
+          path: dist/fieldmind-gcp.tar.gz

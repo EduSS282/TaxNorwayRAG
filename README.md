@@ -28,6 +28,11 @@ See the [repository audit](docs/repository-audit.md) for evidence and remaining 
 For Pierre’s environment checklist and browser demonstration, see
 [Fieldmind GCP preparation](docs/fieldmind-gcp-preparation.md).
 
+The dedicated [Fieldmind GCP folder](deployments/fieldmind-gcp/README.md) targets the provisioned
+private VM: IAP port 8080, attached-identity ADC and Gemini through the `eu` multi-region endpoint.
+It needs no local generation model or source build on the VM. Its connection and installation
+guide includes SSH, file transfer, startup and the browser tunnel.
+
 The demo can also use prebuilt Docker Hub images with `compose.demo.yaml`: copy the deployment
 artifact's `.env.demo.example` to `.env`, set the operator token, then run `docker compose pull`
 and `docker compose up -d --no-build`. Pushes to `main` publish SHA-tagged Linux `amd64` images
